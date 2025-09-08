@@ -8,7 +8,7 @@ function FinalPage() {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [savedImageUrl, setSavedImageUrl] = useState(null);
-  const BASE_URL = process.env.REACT_APP_BACKEND_URL;
+   const BASE_URL = "https://art-photobooth.onrender.com";
 
 
   useEffect(() => {

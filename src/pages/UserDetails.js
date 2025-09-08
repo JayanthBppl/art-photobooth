@@ -20,7 +20,7 @@ function UserAndLayoutPage() {
     { id: "layout4", src: "/layouts/layout4.png" },
   ];
 
-  const BASE_URL = process.env.REACT_APP_BACKEND_URL;
+  const BASE_URL = "https://art-photobooth.onrender.com";
 
   const handleChange = (e) => {
     const { name, value } = e.target;
