@@ -8,7 +8,7 @@ function FinalPage() {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [savedImageUrl, setSavedImageUrl] = useState(null);
-   const BASE_URL = "https://art-photobooth.onrender.com";
+   const BASE_URL = "https://art-photobooth-1.onrender.com";
 
 
   useEffect(() => {

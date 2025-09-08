@@ -16,7 +16,7 @@ const CameraPage = () => {
   const [processing, setProcessing] = useState(false);
   const [showArrow, setShowArrow] = useState(false); // New state
 
-   const BASE_URL = "https://art-photobooth.onrender.com";
+   const BASE_URL = "https://art-photobooth-1.onrender.com";
 
 
   // Show arrow after 10 seconds

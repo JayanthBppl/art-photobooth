@@ -20,7 +20,7 @@ function UserAndLayoutPage() {
     { id: "layout4", src: "/layouts/layout4.png" },
   ];
 
-  const BASE_URL = "https://art-photobooth.onrender.com";
+  const BASE_URL = "https://art-photobooth-1.onrender.com";
 
   const handleChange = (e) => {
     const { name, value } = e.target;
