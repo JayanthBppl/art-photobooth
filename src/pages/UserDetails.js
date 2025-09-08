@@ -86,7 +86,13 @@ function UserAndLayoutPage() {
       {/* Logo only for form */}
       {!formSubmitted && (
         <div className="text-center mb-4">
-          <img src="/logo.png" alt="Logo" className="logo mb-3 img-fluid" style={{ maxWidth: "180px" }} />
+          <img
+            src={`${process.env.PUBLIC_URL}/logo.png`}
+            alt="Logo"
+            className="logo mb-3 img-fluid"
+            style={{ maxWidth: "180px" }}
+          />
+
         </div>
       )}
 
@@ -138,29 +144,18 @@ function UserAndLayoutPage() {
         <div className="layout-selection-container text-center">
           <h2 className="header">Select Layout</h2>
           <div className="layout-grid">
-            {layouts.map((layout) => (
-              <div key={layout.id} className="d-flex justify-content-center">
-                <div
-                  className="card shadow-sm"
-                  onClick={() => chooseLayout(layout)}
-                  style={{
-                    cursor: "pointer",
-                    width: "400px",
-                    transition: "0.3s",
-                  }}
-                >
-                  <img
-                    src={layout.src}
-                    alt={layout.id}
-                    className="card-img-top img-fluid"
-                    style={{
-                      objectFit: "cover",
-                      height: "220px",
-                    }}
-                  />
-                </div>
+            {layouts.map(layout => (
+              <div key={layout.id} onClick={() => chooseLayout(layout)} style={{ cursor: "pointer" }}>
+                <img
+                  src={`${process.env.PUBLIC_URL}${layout.src}`}
+                  alt={layout.id}
+                  className="card-img-top img-fluid"
+                  style={{ objectFit: "cover", height: "220px" }}
+                />
               </div>
             ))}
+
+
           </div>
         </div>
       )}
