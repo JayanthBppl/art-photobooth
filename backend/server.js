@@ -12,7 +12,7 @@ const User = require("./models/User");
 
 const app = express();
 app.use(cors({
-  origin: ["https://map-art-photbooth.netlify.app"], // deployed frontend
+  origin: ["https://map-art-photbooth.netlify.app","http://localhost:3000/"], // deployed frontend
   methods: ["GET","POST","PUT","DELETE"],
   credentials: true
 }));
