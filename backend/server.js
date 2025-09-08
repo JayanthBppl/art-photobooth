@@ -101,8 +101,9 @@ app.get("/capture/:userId", (req, res) => {
   }
 
   const latestFile = files[0].name;
-  const publicUrl = `/user-images/${latestFile}`;
-  res.json({ success: true, filepath: publicUrl });
+  const publicUrl = `${req.protocol}://${req.get("host")}/user-images/${latestFile}`;
+res.json({ success: true, filepath: publicUrl });
+
 });
 
 // Retake → delete last captured Canon photo
