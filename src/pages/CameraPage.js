@@ -16,6 +16,9 @@ const CameraPage = () => {
   const [processing, setProcessing] = useState(false);
   const [showArrow, setShowArrow] = useState(false); // New state
 
+  const BASE_URL = process.env.REACT_APP_BACKEND_URL;
+
+
   // Show arrow after 10 seconds
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -29,7 +32,7 @@ const CameraPage = () => {
     if (!userId) return alert("User ID not found.");
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/capture/${userId}`);
+      const res = await fetch(`${BASE_URL}/capture/${userId}`);
       const data = await res.json();
       if (data.success && data.filepath) {
         setCapturedImage(data.filepath);
@@ -46,7 +49,7 @@ const CameraPage = () => {
 
   const retake = async () => {
     try {
-      await fetch("http://localhost:5000/retake", {
+      await fetch(`${BASE_URL}/retake`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
@@ -60,7 +63,7 @@ const CameraPage = () => {
   const handleNext = async () => {
     try {
       setProcessing(true);
-      const res = await fetch("http://localhost:5000/remove-bg", {
+      const res = await fetch(`${BASE_URL}/remove-bg`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filepath: capturedImage }),
@@ -92,7 +95,7 @@ const CameraPage = () => {
       ) : capturedImage ? (
         <div className="d-flex flex-column align-items-center">
           <img
-            src={`http://localhost:5000${capturedImage}`}
+            src={`${BASE_URL}${capturedImage}`}
             alt="Captured"
             style={{ width: "450px", height: "600px", objectFit: "cover", borderRadius: "10px" }}
           />

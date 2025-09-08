@@ -8,6 +8,8 @@ function FinalPage() {
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [savedImageUrl, setSavedImageUrl] = useState(null);
+  const BASE_URL = process.env.REACT_APP_BACKEND_URL;
+
 
   useEffect(() => {
     if (!layout || !processedImage) {
@@ -32,7 +34,7 @@ function FinalPage() {
         const imageData = canvas.toDataURL("image/png");
 
         // 1️⃣ Save to server
-        const saveRes = await fetch("http://localhost:5000/save-final-image", {
+        const saveRes = await fetch(`${BASE_URL}/save-final-image`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ imageBase64: imageData, userId: user._id }),
@@ -44,7 +46,7 @@ function FinalPage() {
           console.log("✅ Final image saved at:", saveData.filePath);
 
           // 2️⃣ Send email with saved image
-          await fetch("http://localhost:5000/send-email", {
+          await fetch(`${BASE_URL}/send-email`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -120,7 +122,7 @@ function FinalPage() {
         {savedImageUrl && (
           <a
             className="btn btn-success mx-2"
-            href={`http://localhost:5000${savedImageUrl}`}
+            href={`${BASE_URL}${savedImageUrl}`}
             download={`photobooth_${user._id}.png`}
           >
             Download Final Image

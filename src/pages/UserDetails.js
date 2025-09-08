@@ -20,6 +20,8 @@ function UserAndLayoutPage() {
     { id: "layout4", src: "/layouts/layout4.png" },
   ];
 
+  const BASE_URL = process.env.REACT_APP_BACKEND_URL;
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -39,7 +41,7 @@ function UserAndLayoutPage() {
     try {
       setLoading(true);
 
-      const response = await fetch("http://localhost:5000/save-user", {
+      const response = await fetch(`${BASE_URL}/save-user`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

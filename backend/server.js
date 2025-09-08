@@ -11,7 +11,12 @@ const path = require("path");
 const User = require("./models/User");
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: ["https://map-art-photbooth.netlify.app"], // deployed frontend
+  methods: ["GET","POST","PUT","DELETE"],
+  credentials: true
+}));
+
 app.use(express.json({ limit: "50mb" })); // allow large Base64 images
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
