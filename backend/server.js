@@ -17,26 +17,26 @@ app.use(cors({
   credentials: true
 }));
 
-
-app.use(express.json({ limit: "50mb" })); // allow large Base64 images
+app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// ----------------- Storage Paths ----------------- //
+// ✅ Use relative paths so they work on Render too
+const baseDir = path.join(__dirname, "user-images");       // Canon raw images
+const finalDir = path.join(__dirname, "public/final-images"); // Processed images
 
-// ✅ Folder where Canon EOS Utility saves images
-const baseDir = "D:/art-photobooth/public/user-images";
+// Ensure folders exist
+if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir, { recursive: true });
+if (!fs.existsSync(finalDir)) fs.mkdirSync(finalDir, { recursive: true });
 
-// Ensure folder exists
-if (!fs.existsSync(baseDir)) {
-  fs.mkdirSync(baseDir, { recursive: true });
-}
-
-// Serve images publicly
+// Serve folders publicly
 app.use("/user-images", express.static(baseDir));
+app.use("/final-images", express.static(finalDir));
 
-// Multer (for remove.bg uploads)
+// Multer (for uploads)
 const upload = multer({ storage: multer.memoryStorage() });
 
-// ✅ MongoDB connection
+// ----------------- MongoDB ----------------- //
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
@@ -46,7 +46,7 @@ mongoose
   .then(() => console.log("✅ Connected to MongoDB Atlas"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-// ✅ Nodemailer
+// ----------------- Nodemailer ----------------- //
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -55,13 +55,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const finalDir = path.join(__dirname, "public/final-images");
-
-// Ensure folder exists
-if (!fs.existsSync(finalDir)) fs.mkdirSync(finalDir, { recursive: true });
-
-
-// ---------------- API Routes ---------------- //
+// ----------------- Routes ----------------- //
 
 // Save user
 app.post("/save-user", async (req, res) => {
@@ -88,17 +82,14 @@ app.get("/users", async (req, res) => {
   }
 });
 
+// Get latest Canon capture
 app.get("/capture/:userId", (req, res) => {
   const { userId } = req.params;
   if (!userId) return res.status(400).json({ error: "User ID required" });
 
-  // Look directly in baseDir where Canon saves images
-  if (!fs.existsSync(baseDir)) {
-    return res.status(404).json({ error: "No photos found" });
-  }
-
+  // Just look in global Canon folder (not user-specific)
   const files = fs.readdirSync(baseDir)
-    .filter(f => /^IMG_\d{3}\.JPG$/i.test(f))
+    .filter(f => /^IMG_\d{4}\.JPG$/i.test(f)) // IMG_0001.JPG format
     .map(f => ({
       name: f,
       time: fs.statSync(path.join(baseDir, f)).mtime.getTime(),
@@ -110,41 +101,25 @@ app.get("/capture/:userId", (req, res) => {
   }
 
   const latestFile = files[0].name;
-
-  // For user-specific URL, we can still send userId in URL for consistency
   const publicUrl = `/user-images/${latestFile}`;
   res.json({ success: true, filepath: publicUrl });
 });
 
-
-
-
-
-
-// Retake → delete last captured Canon photo from user's folder
+// Retake → delete last captured Canon photo
 app.post("/retake", (req, res) => {
-  const { userId } = req.body;
-  if (!userId) return res.status(400).json({ error: "User ID required" });
-
-  const userFolder = path.join(baseDir, userId);
-  if (!fs.existsSync(userFolder)) {
-    return res.status(404).json({ error: "No photos found for this user" });
-  }
-
-  // Only consider Canon-style captures (IMG_001.JPG, IMG_002.JPG, etc.)
-  const files = fs.readdirSync(userFolder)
-    .filter(f => /^IMG_\d{3}\.JPG$/i.test(f))
+  const files = fs.readdirSync(baseDir)
+    .filter(f => /^IMG_\d{4}\.JPG$/i.test(f))
     .map(f => ({
       name: f,
-      time: fs.statSync(path.join(userFolder, f)).mtime.getTime(),
+      time: fs.statSync(path.join(baseDir, f)).mtime.getTime(),
     }))
-    .sort((a, b) => b.time - a.time); // latest first
+    .sort((a, b) => b.time - a.time);
 
   if (files.length === 0) {
     return res.status(404).json({ error: "No captured photo to delete" });
   }
 
-  const lastFile = path.join(userFolder, files[0].name);
+  const lastFile = path.join(baseDir, files[0].name);
   try {
     fs.unlinkSync(lastFile);
     res.json({ success: true, message: "Last captured photo deleted" });
@@ -154,18 +129,15 @@ app.post("/retake", (req, res) => {
   }
 });
 
-
-
+// Remove background
 app.post("/remove-bg", upload.single("image"), async (req, res) => {
   try {
     let fileBuffer, fileName;
 
     if (req.file) {
-      // Case 1: Image uploaded from frontend as FormData
       fileBuffer = req.file.buffer;
       fileName = req.file.originalname;
     } else if (req.body.filepath) {
-      // Case 2: Path to Canon image already saved in /user-images
       const absPath = path.join(baseDir, path.basename(req.body.filepath));
       if (!fs.existsSync(absPath)) {
         return res.status(404).json({ error: "File not found on server" });
@@ -176,7 +148,6 @@ app.post("/remove-bg", upload.single("image"), async (req, res) => {
       return res.status(400).json({ error: "No image provided" });
     }
 
-    // Send to remove.bg
     const formData = new FormData();
     formData.append("image_file", fileBuffer, fileName);
     formData.append("size", "auto");
@@ -197,8 +168,7 @@ app.post("/remove-bg", upload.single("image"), async (req, res) => {
   }
 });
 
-
-// Send email with final image
+// Send email
 app.post("/send-email", async (req, res) => {
   const { email, image } = req.body;
   if (!email || !image) {
@@ -214,11 +184,7 @@ app.post("/send-email", async (req, res) => {
       html: `<p>Hi 👋,<br/>Here’s your final image from the Art Photobooth.</p>
              <p>It’s also attached to this email.</p>`,
       attachments: [
-        {
-          filename: "photobooth.png",
-          content: imageBuffer,
-          encoding: "base64",
-        },
+        { filename: "photobooth.png", content: imageBuffer, encoding: "base64" },
       ],
     });
 
@@ -237,7 +203,6 @@ app.post("/save-final-image", (req, res) => {
     return res.status(400).json({ error: "Image and userId are required" });
   }
 
-  // Remove base64 prefix
   const base64Data = imageBase64.replace(/^data:image\/png;base64,/, "");
   const fileName = `final_${userId}_${Date.now()}.png`;
   const filePath = path.join(finalDir, fileName);
@@ -251,9 +216,6 @@ app.post("/save-final-image", (req, res) => {
   });
 });
 
-// Serve the folder publicly
-app.use("/final-images", express.static(finalDir));
-
-// ---------------- Start server ---------------- //
+// ----------------- Start server ----------------- //
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Backend running on port ${PORT}`));
