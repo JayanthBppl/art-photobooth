@@ -23,7 +23,7 @@ const CameraPage = () => {
     if (!capturedImage) {
       const timer = setTimeout(() => {
         setShowArrow(true);
-      }, 10000);
+      }, 20000);
       return () => clearTimeout(timer);
     }
   }, [capturedImage]);
@@ -66,7 +66,7 @@ const CameraPage = () => {
         setTimeout(() => {
           setShowArrow(true);
           setLoading(false);
-        }, data.waitTime || 3000);
+        }, data.waitTime || 15000);
       } else {
         alert("No image to delete.");
         setLoading(false);

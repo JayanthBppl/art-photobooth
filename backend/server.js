@@ -2,8 +2,6 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
-const axios = require("axios");
-const FormData = require("form-data");
 const mongoose = require("mongoose");
 const nodemailer = require("nodemailer");
 const path = require("path");
@@ -11,6 +9,8 @@ const { v2: cloudinary } = require("cloudinary");
 const User = require("./models/User");
 
 const app = express();
+
+// ----------------- Middleware ----------------- //
 app.use(
   cors({
     origin: ["https://map-art-photbooth.netlify.app", "http://localhost:3000"],
@@ -18,18 +18,17 @@ app.use(
     credentials: true,
   })
 );
-
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // ----------------- Cloudinary Setup ----------------- //
 cloudinary.config({
-  cloud_name: "df2fypohw",
-  api_key: "195656875558473",
-  api_secret: "wDYh8VkXRPtmS0qM8DakoXuaYr8",
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Multer (in-memory storage)
+// ----------------- Multer (Memory Storage) ----------------- //
 const upload = multer({ storage: multer.memoryStorage() });
 
 // ----------------- MongoDB ----------------- //
@@ -80,9 +79,7 @@ app.get("/users", async (req, res) => {
   }
 });
 
-// ----------------- Image Handling ----------------- //
-
-// Upload DSLR image → Cloudinary
+// ----------------- Cloudinary DSLR Upload ----------------- //
 app.post("/upload-image", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
@@ -107,29 +104,7 @@ app.post("/upload-image", upload.single("image"), async (req, res) => {
   }
 });
 
-
-// ✅ New endpoint to fetch latest DSLR image
-app.get("/cloudinary/latest-dslr", async (req, res) => {
-  try {
-    const result = await cloudinary.search
-      .expression("folder:dslr-images")
-      .sort_by("created_at", "desc")
-      .max_results(1)
-      .execute();
-
-    if (!result.resources || result.resources.length === 0) {
-      return res.json({ url: null });
-    }
-
-    const latest = result.resources[0];
-    res.json({ url: latest.secure_url });
-  } catch (err) {
-    console.error("❌ Error fetching latest photo:", err);
-    res.status(500).json({ error: "Failed to fetch latest photo" });
-  }
-});
-
-// ✅ Retake deletes latest and tells frontend to wait
+// ----------------- Retake Latest DSLR ----------------- //
 app.post("/retake", async (req, res) => {
   try {
     const result = await cloudinary.search
@@ -156,9 +131,10 @@ app.post("/retake", async (req, res) => {
   }
 });
 
+// ----------------- Remove Background ----------------- //
+const axios = require("axios");
+const FormData = require("form-data");
 
-
-// Remove background using remove.bg
 app.post("/remove-bg", upload.single("image"), async (req, res) => {
   try {
     let fileBuffer, fileName;
@@ -200,25 +176,35 @@ app.post("/remove-bg", upload.single("image"), async (req, res) => {
   }
 });
 
-// ----------------- Email ----------------- //
+// ----------------- Send Email with Merged + Optional Images ----------------- //
 app.post("/send-email", async (req, res) => {
-  const { email, image } = req.body;
-  if (!email || !image)
-    return res
-      .status(400)
-      .json({ success: false, message: "Email and image are required" });
+  const { email, mergedImage, layoutImage, userImage } = req.body;
+
+  if (!email || !mergedImage)
+    return res.status(400).json({ success: false, message: "Email and merged image are required" });
 
   try {
-    const imageBuffer = Buffer.from(image.split(",")[1], "base64");
+    // Helper function to convert base64 to attachment
+    const base64ToAttachment = (base64, filename) => ({
+      filename,
+      content: Buffer.from(base64.split(",")[1], "base64"),
+      encoding: "base64",
+    });
+
+    const attachments = [
+      base64ToAttachment(mergedImage, "final-merged.png"),
+    ];
+
+    if (layoutImage) attachments.push(base64ToAttachment(layoutImage, "layout.png"));
+    if (userImage) attachments.push(base64ToAttachment(userImage, "user-image.png"));
+
     await transporter.sendMail({
       from: `"Art Photobooth" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: "🎉 Your Photobooth Image",
-      html: `<p>Hi 👋,<br/>Here’s your final image from the Art Photobooth.</p>
-             <p>It’s also attached to this email.</p>`,
-      attachments: [
-        { filename: "photobooth.png", content: imageBuffer, encoding: "base64" },
-      ],
+      subject: "🎉 Your Photobooth Images",
+      html: `<p>Hi 👋,<br/>Here are your photobooth images.</p>
+             <p>The final merged image is attached along with the original layout and your processed image (if provided).</p>`,
+      attachments,
     });
 
     console.log(`✅ Email sent to ${email}`);
@@ -229,7 +215,7 @@ app.post("/send-email", async (req, res) => {
   }
 });
 
-// ----------------- Start server ----------------- //
+// ----------------- Start Server ----------------- //
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
   console.log(`🚀 Backend running on port ${PORT}`)

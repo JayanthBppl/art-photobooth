@@ -6,10 +6,10 @@ import html2canvas from "html2canvas";
 function FinalPage() {
   const { layout, processedImage, user } = useContext(AppContext);
   const navigate = useNavigate();
-  const [saving, setSaving] = useState(false);
-  const [savedImageUrl, setSavedImageUrl] = useState(null);
-   const BASE_URL = "https://art-photobooth-1.onrender.com";
+  const [sending, setSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
+  const BASE_URL = "https://art-photobooth-1.onrender.com";
 
   useEffect(() => {
     if (!layout || !processedImage) {
@@ -18,14 +18,14 @@ function FinalPage() {
       return;
     }
 
-    const saveAndEmail = async () => {
+    const captureAndSendEmail = async () => {
       try {
         const captureArea = document.getElementById("final-composition");
         if (!captureArea) return;
 
-        setSaving(true);
+        setSending(true);
 
-        // Render the final composition to canvas
+        // Capture final composition as canvas
         const canvas = await html2canvas(captureArea, {
           useCORS: true,
           backgroundColor: null,
@@ -33,38 +33,28 @@ function FinalPage() {
 
         const imageData = canvas.toDataURL("image/png");
 
-        // 1️⃣ Save to server
-        const saveRes = await fetch(`${BASE_URL}/save-final-image`, {
+        // Send merged image directly to backend for email
+        const response = await fetch(`${BASE_URL}/send-email`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageBase64: imageData, userId: user._id }),
+          body: JSON.stringify({ email: user?.email, image: imageData }),
         });
-        const saveData = await saveRes.json();
 
-        if (saveData.success) {
-          setSavedImageUrl(saveData.filePath);
-          console.log("✅ Final image saved at:", saveData.filePath);
-
-          // 2️⃣ Send email with saved image
-          await fetch(`${BASE_URL}/send-email`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: user?.email,
-              imageUrl: saveData.filePath, // send URL instead of base64
-            }),
-          });
-
+        const data = await response.json();
+        if (data.success) {
           console.log("✅ Email sent to", user?.email);
+          setEmailSent(true);
+        } else {
+          console.error("❌ Email failed:", data.message);
         }
       } catch (err) {
-        console.error("❌ Error saving/finalizing image:", err);
+        console.error("❌ Error sending email:", err);
       } finally {
-        setSaving(false);
+        setSending(false);
       }
     };
 
-    saveAndEmail();
+    captureAndSendEmail();
   }, [layout, processedImage, user, navigate]);
 
   if (!layout || !processedImage) {
@@ -74,6 +64,21 @@ function FinalPage() {
       </div>
     );
   }
+
+  const handleDownload = async () => {
+    const captureArea = document.getElementById("final-composition");
+    if (!captureArea) return;
+
+    const canvas = await html2canvas(captureArea, {
+      useCORS: true,
+      backgroundColor: null,
+    });
+
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png");
+    link.download = `photobooth_${user._id}.png`;
+    link.click();
+  };
 
   return (
     <div
@@ -116,21 +121,20 @@ function FinalPage() {
 
       {/* Actions */}
       <div className="mt-4 d-flex flex-column align-items-center">
-        {saving && <p>Saving final image...</p>}
+        {sending && <p>Sending your final image to email...</p>}
+        {emailSent && <p className="text-success">✅ Email sent successfully!</p>}
 
-        {/* Download Button */}
-        {savedImageUrl && (
-          <a
-            className="btn btn-success mx-2"
-            href={`${BASE_URL}${savedImageUrl}`}
-            download={`photobooth_${user._id}.png`}
-          >
-            Download Final Image
-          </a>
-        )}
+        <button
+          className="btn btn-success mx-2 mt-2"
+          onClick={handleDownload}
+        >
+          Download Final Image
+        </button>
 
-        {/* Restart Button */}
-        <button className="btn btn-danger mx-2 mt-2" onClick={() => navigate("/")}>
+        <button
+          className="btn btn-danger mx-2 mt-2"
+          onClick={() => navigate("/")}
+        >
           Restart
         </button>
       </div>
