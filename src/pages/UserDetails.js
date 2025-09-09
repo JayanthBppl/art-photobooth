@@ -16,8 +16,8 @@ function UserAndLayoutPage() {
   const layouts = [
     { id: "layout1", src: "/layouts/layout1.png" },
     { id: "layout2", src: "/layouts/layout2.png" },
-    { id: "layout3", src: "/layouts/layout3.png" },
-    { id: "layout4", src: "/layouts/layout4.png" },
+    // { id: "layout3", src: "/layouts/layout3.png" },
+    // { id: "layout4", src: "/layouts/layout4.png" },
   ];
 
   const BASE_URL = "https://art-photobooth-1.onrender.com";

@@ -140,20 +140,21 @@ const CameraPage = () => {
         <div className="d-flex flex-column align-items-center">
           <h3>Go and Take a picture</h3>
           {showArrow && (
-            <img
-              src={Arrow}
-              alt="Fetch photo"
-              style={{
-                width: "80px",
-                height: "80px",
-                cursor: "pointer",
-                marginTop: "20px",
-                border: "1px solid white",
-                borderRadius: "40px",
-                backgroundColor: "white",
-              }}
-              onClick={getPhoto}
-            />
+            // <img
+            //   src={Arrow}
+            //   alt="Fetch photo"
+            //   style={{
+            //     width: "80px",
+            //     height: "80px",
+            //     cursor: "pointer",
+            //     marginTop: "20px",
+            //     border: "1px solid white",
+            //     borderRadius: "40px",
+            //     backgroundColor: "white",
+            //   }}
+            //   onClick={getPhoto}
+            // />
+            <button style={{width:"auto", padding:"10px 5px", borderRadius:"5px"}} onClick={getPhoto}> View Photo</button>
           )}
         </div>
       )}

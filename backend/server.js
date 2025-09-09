@@ -79,30 +79,29 @@ app.get("/users", async (req, res) => {
   }
 });
 
-// ----------------- Cloudinary DSLR Upload ----------------- //
-app.post("/upload-image", upload.single("image"), async (req, res) => {
+
+// ----------------- Get Latest DSLR Image ----------------- //
+app.get("/cloudinary/latest-dslr", async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    // Search the "dslr-images" folder in Cloudinary and sort by creation time descending
+    const result = await cloudinary.search
+      .expression("folder:dslr-images")
+      .sort_by("created_at", "desc")
+      .max_results(1)
+      .execute();
 
-    const streamUpload = (buffer) =>
-      new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          { folder: "dslr-images" },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        );
-        stream.end(buffer);
-      });
+    if (!result.resources || result.resources.length === 0) {
+      return res.json({ url: null });
+    }
 
-    const result = await streamUpload(req.file.buffer);
-    res.json({ success: true, url: result.secure_url });
+    const latest = result.resources[0];
+    res.json({ url: latest.secure_url });
   } catch (err) {
-    console.error("❌ Upload error:", err);
-    res.status(500).json({ error: "Failed to upload image" });
+    console.error("❌ Error fetching latest DSLR photo:", err);
+    res.status(500).json({ error: "Failed to fetch latest photo" });
   }
 });
+
 
 // ----------------- Retake Latest DSLR ----------------- //
 app.post("/retake", async (req, res) => {
