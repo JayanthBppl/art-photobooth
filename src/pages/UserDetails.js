@@ -1,38 +1,49 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppContext } from "../context/AppContext";
 import "../css/UserDetails.css";
 import "../css/LayoutSelection.css";
 
 function UserAndLayoutPage() {
-  const {user, setUser, setLayout } = useContext(AppContext);
-  
+  const { user, setUser, setLayout } = useContext(AppContext);
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({ name: "", email: "" });
   const [loading, setLoading] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
 
   const layouts = [
     { id: "layout1", src: "/layouts/layout1.png" },
     { id: "layout2", src: "/layouts/layout2.png" },
-    // { id: "layout3", src: "/layouts/layout3.png" },
-    // { id: "layout4", src: "/layouts/layout4.png" },
+    // add more layouts if needed
   ];
 
   const BASE_URL = "https://art-photobooth-1.onrender.com";
 
+  // Preload layout images after form submission
+  useEffect(() => {
+    if (formSubmitted) {
+      const promises = layouts.map(layout => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.src = `${process.env.PUBLIC_URL}${layout.src}`;
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      });
+
+      Promise.all(promises).then(() => setImagesLoaded(true));
+    }
+  }, [formSubmitted]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!formData.name || !formData.email) {
       alert("Please fill in both fields");
       return;
@@ -40,18 +51,14 @@ function UserAndLayoutPage() {
 
     try {
       setLoading(true);
-
       const response = await fetch(`${BASE_URL}/save-user`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
-
       const data = await response.json();
-
       if (data.success) {
         setUser(data.user);
-        console.log("✅ User saved to backend:", data.user);
         setFormSubmitted(true);
       } else {
         alert("Failed to save user");
@@ -64,26 +71,23 @@ function UserAndLayoutPage() {
     }
   };
 
- const chooseLayout = (layout) => {
-  setLayout(layout);
-
-  if (!user) {
-    alert("User not found! Please fill your details first.");
-    return;
-  }
-
-  navigate("/camera", { 
-    state: { 
-      userId: user._id, // or user.id depending on backend
-      layoutId: layout.id
-    } 
-  });
-};
-
+  const chooseLayout = (layout) => {
+    setLayout(layout);
+    if (!user) {
+      alert("User not found! Please fill your details first.");
+      return;
+    }
+    navigate("/camera", {
+      state: {
+        userId: user._id,
+        layoutId: layout.id,
+      },
+    });
+  };
 
   return (
     <div className="container py-5">
-      {/* Logo only for form */}
+      {/* Logo */}
       {!formSubmitted && (
         <div className="text-center mb-4">
           <img
@@ -92,13 +96,15 @@ function UserAndLayoutPage() {
             className="logo mb-3 img-fluid"
             style={{ maxWidth: "180px" }}
           />
-
         </div>
       )}
 
       {/* STEP 1: User Details Form */}
       {!formSubmitted && (
-        <div className="card shadow user-form-card mx-auto" style={{ maxWidth: "500px" }}>
+        <div
+          className="card shadow user-form-card mx-auto"
+          style={{ maxWidth: "500px" }}
+        >
           <div className="card-body text-center">
             <h2 className="mb-4 fs-5">Enter Your Details</h2>
             <form onSubmit={handleSubmit}>
@@ -139,29 +145,49 @@ function UserAndLayoutPage() {
       )}
 
       {/* STEP 2: Layout Selection */}
-      {/* STEP 2: Layout Selection */}
       {formSubmitted && (
         <div className="layout-selection-container text-center">
-          <h2 className="header">Select Layout</h2>
-          <div className="layout-grid">
-            {layouts.map(layout => (
-              <div key={layout.id} onClick={() => chooseLayout(layout)} style={{ cursor: "pointer" }}>
-                <img
-                  src={`${process.env.PUBLIC_URL}${layout.src}`}
-                  alt={layout.id}
-                  className="card-img-top img-fluid"
-                  style={{ objectFit: "cover", height: "220px" }}
-                />
+          <h2 className="header mb-4">Select Layout</h2>
+
+          {!imagesLoaded ? (
+            <div
+              className="d-flex justify-content-center align-items-center"
+              style={{ minHeight: "200px" }}
+            >
+              <div
+                className="spinner-border text-primary"
+                role="status"
+                style={{ width: "3rem", height: "3rem" }}
+              >
+                <span className="visually-hidden">Loading layouts...</span>
               </div>
-            ))}
-
-
-          </div>
+              <p className="mt-2 ms-3">Loading layouts...</p>
+            </div>
+          ) : (
+            <div className="layout-grid d-flex flex-column flex-md-row gap-3 justify-content-center align-items-center">
+              {layouts.map((layout) => (
+                <div
+                  key={layout.id}
+                  onClick={() => chooseLayout(layout)}
+                  style={{ cursor: "pointer", width: "100%", maxWidth: "400px" }}
+                >
+                  <img
+                    src={`${process.env.PUBLIC_URL}${layout.src}`}
+                    alt={layout.id}
+                    className="card-img-top img-fluid"
+                    style={{
+                      width: "100%",
+                      height: "auto",
+                      objectFit: "cover",
+                      borderRadius: "8px",
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
-
-
-
     </div>
   );
 }

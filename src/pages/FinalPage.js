@@ -25,7 +25,6 @@ function FinalPage() {
 
         setSending(true);
 
-        // Capture final composition as canvas
         const canvas = await html2canvas(captureArea, {
           useCORS: true,
           backgroundColor: null,
@@ -33,7 +32,6 @@ function FinalPage() {
 
         const imageData = canvas.toDataURL("image/png");
 
-        // Send merged image directly to backend for email
         const response = await fetch(`${BASE_URL}/send-email`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -82,7 +80,7 @@ function FinalPage() {
 
   return (
     <div
-      className="container-fluid d-flex flex-column justify-content-center align-items-center"
+      className="container-fluid d-flex flex-column justify-content-center align-items-center px-3 py-4"
       style={{ minHeight: "100vh" }}
     >
       {/* Final Composition */}
@@ -91,16 +89,20 @@ function FinalPage() {
         style={{
           position: "relative",
           display: "inline-block",
+          width: "100%",
+          maxWidth: "700px",
         }}
       >
         {/* Layout Template */}
         <img
           src={layout.src}
           alt={layout.id}
+          className="img-fluid"
           style={{
-            width: "700px",
-            height: "400px",
+            width: "100%",
+            height: "auto",
             boxShadow: "0 4px 15px rgba(0, 0, 0, 0.4)",
+            borderRadius: "8px",
           }}
         />
 
@@ -108,33 +110,29 @@ function FinalPage() {
         <img
           src={processedImage}
           alt="User"
+          className="img-fluid"
           style={{
             position: "absolute",
             top: "65%",
             left: "50%",
             transform: "translate(-50%, -50%)",
-            height: "270px",
+            height: "70%", // relative to layout
             width: "auto",
+            maxHeight: "270px",
           }}
         />
       </div>
 
       {/* Actions */}
-      <div className="mt-4 d-flex flex-column align-items-center">
+      <div className="mt-4 d-flex flex-column flex-sm-row align-items-center gap-2">
         {sending && <p>Sending your final image to email...</p>}
         {emailSent && <p className="text-success">✅ Email sent successfully!</p>}
 
-        <button
-          className="btn btn-success mx-2 mt-2"
-          onClick={handleDownload}
-        >
+        <button className="btn btn-success" onClick={handleDownload}>
           Download Final Image
         </button>
 
-        <button
-          className="btn btn-danger mx-2 mt-2"
-          onClick={() => navigate("/")}
-        >
+        <button className="btn btn-danger" onClick={() => navigate("/")}>
           Restart
         </button>
       </div>
