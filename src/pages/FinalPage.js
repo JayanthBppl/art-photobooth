@@ -6,8 +6,10 @@ import html2canvas from "html2canvas";
 function FinalPage() {
   const { layout, processedImage, user } = useContext(AppContext);
   const navigate = useNavigate();
+
   const [sending, setSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [qrCode, setQrCode] = useState(null);
 
   const BASE_URL = "https://art-photobooth-1.onrender.com";
 
@@ -25,28 +27,60 @@ function FinalPage() {
 
         setSending(true);
 
+        // Generate merged image
         const canvas = await html2canvas(captureArea, {
           useCORS: true,
           backgroundColor: null,
         });
 
-        const imageData = canvas.toDataURL("image/png");
+        const mergedImage = canvas.toDataURL("image/png");
 
-        const response = await fetch(`${BASE_URL}/send-email`, {
+        // 1️⃣ Upload merged image to backend (Cloudinary)
+        const uploadRes = await fetch(`${BASE_URL}/upload-final`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: user?.email, image: imageData }),
+          body: JSON.stringify({ image: mergedImage }),
         });
 
-        const data = await response.json();
-        if (data.success) {
+        const uploadData = await uploadRes.json();
+        if (!uploadData.success) {
+          console.error("❌ Upload failed:", uploadData.message);
+          return;
+        }
+
+        const finalImageUrl = uploadData.url; // Cloudinary URL
+
+        // 2️⃣ Send Email with final image
+        const emailRes = await fetch(`${BASE_URL}/send-email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: user?.email,
+            mergedImage,
+          }),
+        });
+
+        const emailData = await emailRes.json();
+        if (emailData.success) {
           console.log("✅ Email sent to", user?.email);
           setEmailSent(true);
         } else {
-          console.error("❌ Email failed:", data.message);
+          console.error("❌ Email failed:", emailData.message);
+        }
+
+        // 3️⃣ Generate QR code for final image
+        const qrRes = await fetch(`${BASE_URL}/generate-qr`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageUrl: finalImageUrl }),
+        });
+
+        const qrData = await qrRes.json();
+        if (qrData.success) {
+          setQrCode(qrData.qrCode);
         }
       } catch (err) {
-        console.error("❌ Error sending email:", err);
+        console.error("❌ Error in finalization flow:", err);
       } finally {
         setSending(false);
       }
@@ -136,6 +170,14 @@ function FinalPage() {
           Restart
         </button>
       </div>
+
+      {/* QR Code */}
+      {qrCode && (
+        <div className="mt-4 text-center">
+          <h5>📲 Scan to Download</h5>
+          <img src={qrCode} alt="QR Code" style={{ width: "200px" }} />
+        </div>
+      )}
     </div>
   );
 }

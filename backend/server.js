@@ -6,6 +6,9 @@ const mongoose = require("mongoose");
 const nodemailer = require("nodemailer");
 const path = require("path");
 const { v2: cloudinary } = require("cloudinary");
+const QRCode = require("qrcode");
+const axios = require("axios");
+const FormData = require("form-data");
 const User = require("./models/User");
 
 const app = express();
@@ -79,11 +82,9 @@ app.get("/users", async (req, res) => {
   }
 });
 
-
 // ----------------- Get Latest DSLR Image ----------------- //
 app.get("/cloudinary/latest-dslr", async (req, res) => {
   try {
-    // Search the "dslr-images" folder in Cloudinary and sort by creation time descending
     const result = await cloudinary.search
       .expression("folder:dslr-images")
       .sort_by("created_at", "desc")
@@ -101,7 +102,6 @@ app.get("/cloudinary/latest-dslr", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch latest photo" });
   }
 });
-
 
 // ----------------- Retake Latest DSLR ----------------- //
 app.post("/retake", async (req, res) => {
@@ -131,9 +131,6 @@ app.post("/retake", async (req, res) => {
 });
 
 // ----------------- Remove Background ----------------- //
-const axios = require("axios");
-const FormData = require("form-data");
-
 app.post("/remove-bg", upload.single("image"), async (req, res) => {
   try {
     let fileBuffer, fileName;
@@ -175,7 +172,25 @@ app.post("/remove-bg", upload.single("image"), async (req, res) => {
   }
 });
 
-// ----------------- Send Email with Merged + Optional Images ----------------- //
+// ----------------- Upload Final Image to Cloudinary ----------------- //
+app.post("/upload-final", async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image)
+      return res.status(400).json({ success: false, message: "No image provided" });
+
+    const uploadRes = await cloudinary.uploader.upload(image, {
+      folder: "final-layouts",
+    });
+
+    res.json({ success: true, url: uploadRes.secure_url });
+  } catch (err) {
+    console.error("❌ Upload error:", err);
+    res.status(500).json({ success: false, message: "Failed to upload image" });
+  }
+});
+
+// ----------------- Send Email with Images ----------------- //
 app.post("/send-email", async (req, res) => {
   const { email, mergedImage, layoutImage, userImage } = req.body;
 
@@ -183,17 +198,13 @@ app.post("/send-email", async (req, res) => {
     return res.status(400).json({ success: false, message: "Email and merged image are required" });
 
   try {
-    // Helper function to convert base64 to attachment
     const base64ToAttachment = (base64, filename) => ({
       filename,
       content: Buffer.from(base64.split(",")[1], "base64"),
       encoding: "base64",
     });
 
-    const attachments = [
-      base64ToAttachment(mergedImage, "final-merged.png"),
-    ];
-
+    const attachments = [base64ToAttachment(mergedImage, "final-merged.png")];
     if (layoutImage) attachments.push(base64ToAttachment(layoutImage, "layout.png"));
     if (userImage) attachments.push(base64ToAttachment(userImage, "user-image.png"));
 
@@ -214,8 +225,21 @@ app.post("/send-email", async (req, res) => {
   }
 });
 
+// ----------------- Generate QR Code ----------------- //
+app.post("/generate-qr", async (req, res) => {
+  const { imageUrl } = req.body;
+  if (!imageUrl)
+    return res.status(400).json({ success: false, message: "Image URL is required" });
+
+  try {
+    const qrDataUrl = await QRCode.toDataURL(imageUrl, { width: 300 });
+    res.json({ success: true, qrCode: qrDataUrl });
+  } catch (err) {
+    console.error("❌ QR Code error:", err);
+    res.status(500).json({ success: false, message: "Failed to generate QR code" });
+  }
+});
+
 // ----------------- Start Server ----------------- //
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-  console.log(`🚀 Backend running on port ${PORT}`)
-);
+app.listen(PORT, () => console.log(`🚀 Backend running on port ${PORT}`));
