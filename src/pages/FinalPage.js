@@ -97,27 +97,14 @@ function FinalPage() {
     );
   }
 
-  const handleDownload = async () => {
-    const captureArea = document.getElementById("final-composition");
-    if (!captureArea) return;
-
-    const canvas = await html2canvas(captureArea, {
-      useCORS: true,
-      backgroundColor: null,
-    });
-
-    const link = document.createElement("a");
-    link.href = canvas.toDataURL("image/png");
-    link.download = `photobooth_${user._id}.png`;
-    link.click();
-  };
-
   return (
-    <div
-      className="container-fluid d-flex flex-column justify-content-center align-items-center px-3 py-4"
-      style={{ minHeight: "100vh" }}
-    >
-      {/* Final Composition */}
+   <div
+  className="container-fluid px-3 py-4"
+  style={{ minHeight: "100vh" }}
+>
+  <div className="row justify-content-center align-items-center h-100">
+    {/* Left: Final Composition */}
+    <div className="col-lg-6 d-flex flex-column align-items-center mb-4 mb-lg-0">
       <div
         id="final-composition"
         style={{
@@ -150,7 +137,7 @@ function FinalPage() {
             top: "65%",
             left: "50%",
             transform: "translate(-50%, -50%)",
-            height: "70%", // relative to layout
+            height: "70%",
             width: "auto",
             maxHeight: "270px",
           }}
@@ -162,23 +149,25 @@ function FinalPage() {
         {sending && <p>Sending your final image to email...</p>}
         {emailSent && <p className="text-success">✅ Email sent successfully!</p>}
 
-        <button className="btn btn-success" onClick={handleDownload}>
-          Download Final Image
-        </button>
-
         <button className="btn btn-danger" onClick={() => navigate("/")}>
-          Restart
+          Home
         </button>
       </div>
+    </div>
 
-      {/* QR Code */}
+    {/* Right: QR Code */}
+    <div className="col-lg-4 d-flex flex-column align-items-center">
       {qrCode && (
-        <div className="mt-4 text-center">
-          <h5>📲 Scan to Download</h5>
-          <img src={qrCode} alt="QR Code" style={{ width: "200px" }} />
+        <div className="text-center">
+          <h6> Scan to Download</h6>
+          <img src={qrCode} alt="QR Code" style={{ width: "250px" }} />
         </div>
       )}
     </div>
+  </div>
+</div>
+
+
   );
 }
 
