@@ -178,43 +178,22 @@ app.post("/remove-bg", upload.single("image"), async (req, res) => {
 // ----------------- Upload Final Image to Cloudinary ----------------- //
 app.post("/upload-final", async (req, res) => {
   try {
-    const { userImage, layoutTemplate } = req.body;
-    if (!userImage || !layoutTemplate) {
-      return res.status(400).json({ success: false, message: "Missing images" });
-    }
+    const { image } = req.body;
+    if (!image)
+      return res.status(400).json({ success: false, message: "No image provided" });
 
-    // Upload user image
-    const userUpload = await cloudinary.uploader.upload(userImage, {
-      folder: "user-images",
-    });
-
-    // Upload layout template
-    const layoutUpload = await cloudinary.uploader.upload(layoutTemplate, {
-      folder: "layouts",
-    });
-
-    // Create final composition using overlay
-    const composedUrl = cloudinary.url(layoutUpload.public_id, {
-      transformation: [
-        {
-          overlay: `user-images/${userUpload.public_id.split("/").pop()}`,
-          width: 400,       // adjust based on your layout
-          height: 400,
-          x: 0,
-          y: 100,
-          crop: "fit",
-        },
-      ],
-      format: "png",
-    });
-
-    res.json({ success: true, url: composedUrl });
-  } catch (err) {
-    console.error("❌ Overlay error:", err);
-    res.status(500).json({ success: false, message: "Failed to compose image" });
-  }
+    const uploadRes = await cloudinary.uploader.upload(image, {
+  folder: "final-layouts",
+  quality: "auto:best",  // Cloudinary auto-optimizes for best visual quality
+  fetch_format: "auto",  // let Cloudinary decide (WebP/AVIF etc.)
 });
 
+    res.json({ success: true, url: uploadRes.secure_url });
+  } catch (err) {
+    console.error("❌ Upload error:", err);
+    res.status(500).json({ success: false, message: "Failed to upload image" });
+  }
+});
 
 const lastSent = new Map();
 
