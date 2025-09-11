@@ -46,12 +46,15 @@ mongoose
 
 // ----------------- Nodemailer ----------------- //
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: false, // use STARTTLS, keep false for port 587
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
   },
 });
+
 
 // ----------------- Routes ----------------- //
 
@@ -209,7 +212,7 @@ app.post("/send-email", async (req, res) => {
     if (userImage) attachments.push(base64ToAttachment(userImage, "user-image.png"));
 
     await transporter.sendMail({
-      from: `"Art Photobooth" <${process.env.EMAIL_USER}>`,
+      from: `"Art Photobooth" <${process.env.SMTP_SENDER}>`,
       to: email,
       subject: "🎉 Your Photobooth Images",
       html: `<p>Hi 👋,<br/>Here are your photobooth images.</p>
@@ -224,6 +227,7 @@ app.post("/send-email", async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to send email" });
   }
 });
+
 
 // ----------------- Generate QR Code ----------------- //
 app.post("/generate-qr", async (req, res) => {

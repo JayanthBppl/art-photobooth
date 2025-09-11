@@ -51,12 +51,14 @@ function FinalPage() {
         const finalImageUrl = uploadData.url; // Cloudinary URL
 
         // 2️⃣ Send Email with final image
+        // 2️⃣ Send Email with final image
         const emailRes = await fetch(`${BASE_URL}/send-email`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email: user?.email,
             mergedImage,
+            sender: "hello@map-india.org", // 👈 add this line
           }),
         });
 
@@ -156,11 +158,12 @@ function FinalPage() {
     </div>
 
     {/* Right: QR Code */}
-    <div className="col-lg-4 d-flex flex-column align-items-center">
+    <div className="col-lg-4 d-flex flex-column align-items-center mt-5 pt-5">
       {qrCode && (
         <div className="text-center">
-          <h6> Scan to Download</h6>
+          
           <img src={qrCode} alt="QR Code" style={{ width: "250px" }} />
+          <h6> Scan and download the image</h6>
         </div>
       )}
     </div>
