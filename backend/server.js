@@ -184,6 +184,8 @@ app.post("/upload-final", async (req, res) => {
 
     const uploadRes = await cloudinary.uploader.upload(image, {
       folder: "final-layouts",
+      quality: "auto:best",  // Cloudinary auto-optimizes for best visual quality
+      fetch_format: "auto",  // let Cloudinary decide (WebP/AVIF etc.)
     });
 
     res.json({ success: true, url: uploadRes.secure_url });

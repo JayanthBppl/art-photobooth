@@ -17,7 +17,7 @@ const CameraPage = () => {
 
   const [showText, setShowText] = useState(false);
   const [showLoadingGif, setShowLoadingGif] = useState(false);
-  const [countdown, setCountdown] = useState(20);
+  const [countdown, setCountdown] = useState(5);
   const [showButton, setShowButton] = useState(false);
 
   const BASE_URL = "https://art-photobooth-1.onrender.com";
@@ -31,7 +31,7 @@ const CameraPage = () => {
       const textTimer = setTimeout(() => {
         setShowText(false);
         setShowLoadingGif(true);
-      }, 5000);
+      }, 1000);
 
       return () => clearTimeout(textTimer);
     }
@@ -40,7 +40,7 @@ const CameraPage = () => {
   // Countdown for loading GIF before showing button
   useEffect(() => {
     if (showLoadingGif && !capturedImage) {
-      setCountdown(15);
+      setCountdown(3);
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -164,7 +164,7 @@ const CameraPage = () => {
         </div>
       ) : (
         <div className="d-flex flex-column align-items-center">
-          {showText && <h3 className="text-center">Go and take a photo</h3>}
+          {showText && <h3 className="text-center">Getting your photo</h3>}
           {showLoadingGif && (
             <div className="d-flex flex-column align-items-center mt-3">
               <img src={LoadingGif} alt="Loading..." className="img-fluid" style={{ maxWidth: "50px" }} />

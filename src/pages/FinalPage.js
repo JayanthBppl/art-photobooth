@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from "react";
+import React, { useContext, useEffect, useState, useRef } from "react";
 import { AppContext } from "../context/AppContext";
 import { useNavigate } from "react-router-dom";
 import html2canvas from "html2canvas";
@@ -10,7 +10,8 @@ function FinalPage() {
   const [sending, setSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [qrCode, setQrCode] = useState(null);
-  const [emailTriggered, setEmailTriggered] = useState(false); // ✅ Prevent duplicates
+
+  const hasRunRef = useRef(false); // ✅ guard against double trigger
 
   const BASE_URL = "https://art-photobooth-1.onrender.com";
 
@@ -21,11 +22,12 @@ function FinalPage() {
       return;
     }
 
-    if (emailTriggered) return; // ✅ Skip if already triggered
+    // ✅ Prevent running twice (React Strict Mode)
+    if (hasRunRef.current) return;
+    hasRunRef.current = true;
 
     const captureAndSendEmail = async () => {
       try {
-        setEmailTriggered(true); // ✅ Lock to prevent duplicate calls
         setSending(true);
 
         const captureArea = document.getElementById("final-composition");
@@ -35,6 +37,7 @@ function FinalPage() {
         const canvas = await html2canvas(captureArea, {
           useCORS: true,
           backgroundColor: null,
+          scale:2
         });
         const mergedImage = canvas.toDataURL("image/png");
 
@@ -48,31 +51,31 @@ function FinalPage() {
         const uploadData = await uploadRes.json();
         if (!uploadData.success) {
           console.error("❌ Upload failed:", uploadData.message);
-          setEmailTriggered(false); // allow retry on failure
+          hasRunRef.current = false; // allow retry on failure
           return;
         }
 
-        const finalImageUrl = uploadData.url; // Cloudinary URL ✅
+        const finalImageUrl = uploadData.url; // ✅ Cloudinary URL
 
         // ✅ Send Email with Cloudinary URL (NOT base64)
-        const emailRes = await fetch(`${BASE_URL}/send-email`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: user?.email,
-            imageUrl: finalImageUrl,
-            sender: "hello@map-india.org",
-          }),
-        });
+        // const emailRes = await fetch(`${BASE_URL}/send-email`, {
+        //   method: "POST",
+        //   headers: { "Content-Type": "application/json" },
+        //   body: JSON.stringify({
+        //     email: user?.email,
+        //     imageUrl: finalImageUrl,
+        //     sender: "hello@map-india.org",
+        //   }),
+        // });
 
-        const emailData = await emailRes.json();
-        if (emailData.success) {
-          console.log("✅ Email sent to", user?.email);
-          setEmailSent(true);
-        } else {
-          console.error("❌ Email failed:", emailData.message);
-          setEmailTriggered(false); // allow retry if failed
-        }
+        // const emailData = await emailRes.json();
+        // if (emailData.success) {
+        //   console.log("✅ Email sent to", user?.email);
+        //   setEmailSent(true);
+        // } else {
+        //   console.error("❌ Email failed:", emailData.message);
+        //   hasRunRef.current = false; // allow retry
+        // }
 
         // ✅ Generate QR code for final image
         const qrRes = await fetch(`${BASE_URL}/generate-qr`, {
@@ -87,14 +90,14 @@ function FinalPage() {
         }
       } catch (err) {
         console.error("❌ Error in finalization flow:", err);
-        setEmailTriggered(false); // reset so retry is possible
+        hasRunRef.current = false; // reset so retry is possible
       } finally {
         setSending(false);
       }
     };
 
     captureAndSendEmail();
-  }, [layout, processedImage, user, navigate, emailTriggered]);
+  }, [layout, processedImage, user, navigate]);
 
   if (!layout || !processedImage) {
     return (
@@ -149,14 +152,18 @@ function FinalPage() {
           </div>
 
           {/* Actions */}
-          <div className="mt-4 d-flex flex-column flex-sm-row align-items-center gap-2">
-            {sending && <p>Sending your final image to email...</p>}
-            {emailSent && <p className="text-success">✅ Email sent successfully!</p>}
+          <div className="mt-4 text-center">
+            {/* {sending && <p>Sending your final image to email.</p>}
+            {emailSent && <p className="text-success">✅ Email sent successfully!</p>} */}
 
-            <button className="btn btn-danger" onClick={() => navigate("/")}>
-              Home
-            </button>
+            {/* Home button always below */}
+            <div className="mt-3">
+              <button className="btn btn-danger" onClick={() => navigate("/")}>
+                Home
+              </button>
+            </div>
           </div>
+
         </div>
 
         {/* Right: QR Code */}
