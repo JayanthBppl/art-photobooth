@@ -194,30 +194,38 @@ app.post("/upload-final", async (req, res) => {
 });
 
 // ----------------- Send Email with Images ----------------- //
+// ----------------- Send Email with Final Image (via Cloudinary URL) ----------------- //
 app.post("/send-email", async (req, res) => {
-  const { email, mergedImage, layoutImage, userImage } = req.body;
+  const { email, imageUrl } = req.body;
 
-  if (!email || !mergedImage)
-    return res.status(400).json({ success: false, message: "Email and merged image are required" });
+  if (!email || !imageUrl) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Email and imageUrl are required" });
+  }
 
   try {
-    const base64ToAttachment = (base64, filename) => ({
-      filename,
-      content: Buffer.from(base64.split(",")[1], "base64"),
-      encoding: "base64",
-    });
-
-    const attachments = [base64ToAttachment(mergedImage, "final-merged.png")];
-    if (layoutImage) attachments.push(base64ToAttachment(layoutImage, "layout.png"));
-    if (userImage) attachments.push(base64ToAttachment(userImage, "user-image.png"));
-
     await transporter.sendMail({
       from: `"Art Photobooth" <${process.env.SMTP_SENDER}>`,
       to: email,
-      subject: "🎉 Your Photobooth Images",
-      html: `<p>Hi 👋,<br/>Here are your photobooth images.</p>
-             <p>The final merged image is attached along with the original layout and your processed image (if provided).</p>`,
-      attachments,
+      subject: "🎉 Your Photobooth Image",
+      html: `
+        <p>Hi 👋,</p>
+        <p>Thanks for using our photobooth! 🎨✨</p>
+        <p>You can view your final image below:</p>
+        <div style="text-align:center; margin:20px 0;">
+          <img src="${imageUrl}" alt="Final Image" style="max-width:100%; border-radius:8px;"/>
+        </div>
+        <p>Or download it here: <a href="${imageUrl}" target="_blank">${imageUrl}</a></p>
+        <br/>
+        <p>Cheers,<br/>Art Photobooth Team</p>
+      `,
+      attachments: [
+        {
+          filename: "final-image.png",
+          path: imageUrl, // attach directly from Cloudinary
+        },
+      ],
     });
 
     console.log(`✅ Email sent to ${email}`);

@@ -27,15 +27,14 @@ function FinalPage() {
 
         setSending(true);
 
-        // Generate merged image
+        // ✅ Generate merged image
         const canvas = await html2canvas(captureArea, {
           useCORS: true,
           backgroundColor: null,
         });
-
         const mergedImage = canvas.toDataURL("image/png");
 
-        // 1️⃣ Upload merged image to backend (Cloudinary)
+        // ✅ Upload merged image to backend (Cloudinary)
         const uploadRes = await fetch(`${BASE_URL}/upload-final`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -48,17 +47,16 @@ function FinalPage() {
           return;
         }
 
-        const finalImageUrl = uploadData.url; // Cloudinary URL
+        const finalImageUrl = uploadData.url; // Cloudinary URL ✅
 
-        // 2️⃣ Send Email with final image
-        // 2️⃣ Send Email with final image
+        // ✅ Send Email with Cloudinary URL (NOT base64)
         const emailRes = await fetch(`${BASE_URL}/send-email`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email: user?.email,
-            mergedImage,
-            sender: "hello@map-india.org", // 👈 add this line
+            imageUrl: finalImageUrl, // 👈 send only URL
+            sender: "hello@map-india.org",
           }),
         });
 
@@ -70,7 +68,7 @@ function FinalPage() {
           console.error("❌ Email failed:", emailData.message);
         }
 
-        // 3️⃣ Generate QR code for final image
+        // ✅ Generate QR code for final image
         const qrRes = await fetch(`${BASE_URL}/generate-qr`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -100,77 +98,71 @@ function FinalPage() {
   }
 
   return (
-   <div
-  className="container-fluid px-3 py-4"
-  style={{ minHeight: "100vh" }}
->
-  <div className="row justify-content-center align-items-center h-100">
-    {/* Left: Final Composition */}
-    <div className="col-lg-6 d-flex flex-column align-items-center mb-4 mb-lg-0">
-      <div
-        id="final-composition"
-        style={{
-          position: "relative",
-          display: "inline-block",
-          width: "100%",
-          maxWidth: "700px",
-        }}
-      >
-        {/* Layout Template */}
-        <img
-          src={layout.src}
-          alt={layout.id}
-          className="img-fluid"
-          style={{
-            width: "100%",
-            height: "auto",
-            boxShadow: "0 4px 15px rgba(0, 0, 0, 0.4)",
-            borderRadius: "8px",
-          }}
-        />
+    <div className="container-fluid px-3 py-4" style={{ minHeight: "100vh" }}>
+      <div className="row justify-content-center align-items-center h-100">
+        {/* Left: Final Composition */}
+        <div className="col-lg-6 d-flex flex-column align-items-center mb-4 mb-lg-0">
+          <div
+            id="final-composition"
+            style={{
+              position: "relative",
+              display: "inline-block",
+              width: "100%",
+              maxWidth: "700px",
+            }}
+          >
+            {/* Layout Template */}
+            <img
+              src={layout.src}
+              alt={layout.id}
+              className="img-fluid"
+              style={{
+                width: "100%",
+                height: "auto",
+                boxShadow: "0 4px 15px rgba(0, 0, 0, 0.4)",
+                borderRadius: "8px",
+              }}
+            />
 
-        {/* User Image */}
-        <img
-          src={processedImage}
-          alt="User"
-          className="img-fluid"
-          style={{
-            position: "absolute",
-            top: "65%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            height: "70%",
-            width: "auto",
-            maxHeight: "270px",
-          }}
-        />
-      </div>
+            {/* User Image */}
+            <img
+              src={processedImage}
+              alt="User"
+              className="img-fluid"
+              style={{
+                position: "absolute",
+                top: "65%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                height: "70%",
+                width: "auto",
+                maxHeight: "270px",
+              }}
+            />
+          </div>
 
-      {/* Actions */}
-      <div className="mt-4 d-flex flex-column flex-sm-row align-items-center gap-2">
-        {sending && <p>Sending your final image to email...</p>}
-        {emailSent && <p className="text-success">✅ Email sent successfully!</p>}
+          {/* Actions */}
+          <div className="mt-4 d-flex flex-column flex-sm-row align-items-center gap-2">
+            {sending && <p>Sending your final image to email...</p>}
+            {emailSent && <p className="text-success">✅ Email sent successfully!</p>}
 
-        <button className="btn btn-danger" onClick={() => navigate("/")}>
-          Home
-        </button>
-      </div>
-    </div>
-
-    {/* Right: QR Code */}
-    <div className="col-lg-4 d-flex flex-column align-items-center mt-5 pt-5">
-      {qrCode && (
-        <div className="text-center">
-          
-          <img src={qrCode} alt="QR Code" style={{ width: "250px" }} />
-          <h6> Scan and download the image</h6>
+            <button className="btn btn-danger" onClick={() => navigate("/")}>
+              Home
+            </button>
+          </div>
         </div>
-      )}
+
+        {/* Right: QR Code */}
+        <div className="col-lg-4 d-flex flex-column align-items-center mt-5 pt-5">
+          {qrCode && (
+            <div className="text-center">
+              <img src={qrCode} alt="QR Code" style={{ width: "250px" }} />
+              <h6> Scan and download the image</h6>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
-  </div>
-</div>
-
-
   );
 }
 
