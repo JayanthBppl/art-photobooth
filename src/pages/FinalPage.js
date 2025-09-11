@@ -33,20 +33,24 @@ function FinalPage() {
         const captureArea = document.getElementById("final-composition");
         if (!captureArea) return;
 
-        // ✅ Generate merged image
-        const canvas = await html2canvas(captureArea, {
-          useCORS: true,
-          backgroundColor: null,
-          scale:2
-        });
-        const mergedImage = canvas.toDataURL("image/png");
+        // // ✅ Generate merged image
+        // const canvas = await html2canvas(captureArea, {
+        //   useCORS: true,
+        //   backgroundColor: null,
+        //   scale:2
+        // });
+        // const mergedImage = canvas.toDataURL("image/png");
 
         // ✅ Upload merged image to backend (Cloudinary)
-        const uploadRes = await fetch(`${BASE_URL}/upload-final`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: mergedImage }),
-        });
+       const uploadRes = await fetch(`${BASE_URL}/upload-final`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    userImage: processedImage,   // raw image (base64 or direct URL)
+    layoutTemplate: layout.src,  // template image (URL/base64)
+  }),
+});
+
 
         const uploadData = await uploadRes.json();
         if (!uploadData.success) {
@@ -58,24 +62,24 @@ function FinalPage() {
         const finalImageUrl = uploadData.url; // ✅ Cloudinary URL
 
         // ✅ Send Email with Cloudinary URL (NOT base64)
-        // const emailRes = await fetch(`${BASE_URL}/send-email`, {
-        //   method: "POST",
-        //   headers: { "Content-Type": "application/json" },
-        //   body: JSON.stringify({
-        //     email: user?.email,
-        //     imageUrl: finalImageUrl,
-        //     sender: "hello@map-india.org",
-        //   }),
-        // });
+        const emailRes = await fetch(`${BASE_URL}/send-email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: user?.email,
+            imageUrl: finalImageUrl,
+            sender: "hello@map-india.org",
+          }),
+        });
 
-        // const emailData = await emailRes.json();
-        // if (emailData.success) {
-        //   console.log("✅ Email sent to", user?.email);
-        //   setEmailSent(true);
-        // } else {
-        //   console.error("❌ Email failed:", emailData.message);
-        //   hasRunRef.current = false; // allow retry
-        // }
+        const emailData = await emailRes.json();
+        if (emailData.success) {
+          console.log("✅ Email sent to", user?.email);
+          setEmailSent(true);
+        } else {
+          console.error("❌ Email failed:", emailData.message);
+          hasRunRef.current = false; // allow retry
+        }
 
         // ✅ Generate QR code for final image
         const qrRes = await fetch(`${BASE_URL}/generate-qr`, {
@@ -153,8 +157,8 @@ function FinalPage() {
 
           {/* Actions */}
           <div className="mt-4 text-center">
-            {/* {sending && <p>Sending your final image to email.</p>}
-            {emailSent && <p className="text-success">✅ Email sent successfully!</p>} */}
+            {sending && <p>Sending your final image to email.</p>}
+            {emailSent && <p className="text-success">✅ Email sent successfully!</p>}
 
             {/* Home button always below */}
             <div className="mt-3">
