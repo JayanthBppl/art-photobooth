@@ -218,7 +218,7 @@ app.post("/send-email", async (req, res) => {
 
   try {
     await transporter.sendMail({
-      from: `"Art Photobooth" <${process.env.SMTP_SENDER}>`,
+      from: `"Museum of Art and Photography" <${process.env.SMTP_SENDER}>`,
       to: email,
       subject: "🎉 Your Photobooth Image",
       html: `
