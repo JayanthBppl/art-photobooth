@@ -220,12 +220,6 @@ app.post("/send-email", async (req, res) => {
         <br/>
         <p>Cheers,<br/>Art Photobooth Team</p>
       `,
-      attachments: [
-        {
-          filename: "final-image.png",
-          path: imageUrl, // attach directly from Cloudinary
-        },
-      ],
     });
 
     console.log(`✅ Email sent to ${email}`);
@@ -235,6 +229,7 @@ app.post("/send-email", async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to send email" });
   }
 });
+
 
 
 // ----------------- Generate QR Code ----------------- //
