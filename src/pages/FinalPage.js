@@ -10,6 +10,7 @@ function FinalPage() {
   const [sending, setSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [qrCode, setQrCode] = useState(null);
+  const [emailTriggered, setEmailTriggered] = useState(false); // ✅ Prevent duplicates
 
   const BASE_URL = "https://art-photobooth-1.onrender.com";
 
@@ -20,12 +21,15 @@ function FinalPage() {
       return;
     }
 
+    if (emailTriggered) return; // ✅ Skip if already triggered
+
     const captureAndSendEmail = async () => {
       try {
+        setEmailTriggered(true); // ✅ Lock to prevent duplicate calls
+        setSending(true);
+
         const captureArea = document.getElementById("final-composition");
         if (!captureArea) return;
-
-        setSending(true);
 
         // ✅ Generate merged image
         const canvas = await html2canvas(captureArea, {
@@ -44,6 +48,7 @@ function FinalPage() {
         const uploadData = await uploadRes.json();
         if (!uploadData.success) {
           console.error("❌ Upload failed:", uploadData.message);
+          setEmailTriggered(false); // allow retry on failure
           return;
         }
 
@@ -55,7 +60,7 @@ function FinalPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             email: user?.email,
-            imageUrl: finalImageUrl, // 👈 send only URL
+            imageUrl: finalImageUrl,
             sender: "hello@map-india.org",
           }),
         });
@@ -66,6 +71,7 @@ function FinalPage() {
           setEmailSent(true);
         } else {
           console.error("❌ Email failed:", emailData.message);
+          setEmailTriggered(false); // allow retry if failed
         }
 
         // ✅ Generate QR code for final image
@@ -81,13 +87,14 @@ function FinalPage() {
         }
       } catch (err) {
         console.error("❌ Error in finalization flow:", err);
+        setEmailTriggered(false); // reset so retry is possible
       } finally {
         setSending(false);
       }
     };
 
     captureAndSendEmail();
-  }, [layout, processedImage, user, navigate]);
+  }, [layout, processedImage, user, navigate, emailTriggered]);
 
   if (!layout || !processedImage) {
     return (

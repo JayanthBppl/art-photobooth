@@ -193,8 +193,8 @@ app.post("/upload-final", async (req, res) => {
   }
 });
 
-// ----------------- Send Email with Images ----------------- //
-// ----------------- Send Email with Final Image (via Cloudinary URL) ----------------- //
+const lastSent = new Map();
+
 app.post("/send-email", async (req, res) => {
   const { email, imageUrl } = req.body;
 
@@ -202,6 +202,18 @@ app.post("/send-email", async (req, res) => {
     return res
       .status(400)
       .json({ success: false, message: "Email and imageUrl are required" });
+  }
+
+  const now = Date.now();
+  const lastTime = lastSent.get(email) || 0;
+
+  // prevent duplicate sends within 15 seconds
+  if (now - lastTime < 15000) {
+    console.log(`⚠️ Duplicate email blocked for ${email}`);
+    return res.json({
+      success: true,
+      message: "Email already sent recently (blocked duplicate)",
+    });
   }
 
   try {
@@ -221,6 +233,9 @@ app.post("/send-email", async (req, res) => {
         <p>Cheers,<br/>Art Photobooth Team</p>
       `,
     });
+
+    // record timestamp to block future duplicates
+    lastSent.set(email, now);
 
     console.log(`✅ Email sent to ${email}`);
     res.json({ success: true, message: "Email sent successfully" });
