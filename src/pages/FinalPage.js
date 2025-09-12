@@ -47,14 +47,10 @@ function FinalPage() {
           hasRunRef.current = false;
           return;
         }
-
-        // ✅ Save the Cloudinary-composed URL
-        setFinalImageUrl(uploadData.finalUrl);
-
-        // ✅ Check email status from backend response
-        if (uploadData.emailSent) {
-          setEmailSent(true);
+        if(uploadData.emailSent === true){
+          alert("Email sent successfully")
         }
+
 
         // // ✅ Generate QR code
         // const qrRes = await fetch(`${BASE_URL}/generate-qr`, {

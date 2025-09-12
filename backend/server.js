@@ -11,6 +11,9 @@ const axios = require("axios");
 const FormData = require("form-data");
 const User = require("./models/User");
 const sharp = require("sharp");
+const fs = require("fs");
+
+
 
 
 const app = express();
@@ -172,6 +175,9 @@ app.post("/remove-bg", upload.single("image"), async (req, res) => {
   }
 });
 
+
+
+
 app.post("/compose-final", async (req, res) => {
   try {
     const { userImage, layoutId, email } = req.body;
@@ -181,117 +187,92 @@ app.post("/compose-final", async (req, res) => {
         .status(400)
         .json({ success: false, message: "Missing userImage or layoutId" });
     }
+     const layoutsDir = path.join(__dirname, "assets");
+    const outputDir = path.join(__dirname, "final-images");
 
-    // 1️⃣ Upload user image to Cloudinary (temporary)
-    const userUpload = await cloudinary.uploader.upload(userImage, {
-      folder: "user-uploads",
-      quality: "auto:good",
-    });
+    // ✅ Ensure final-images folder exists
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
 
-    // 2️⃣ Map layoutId to actual Cloudinary public_id
+    // 1️⃣ Load layout locally (no Cloudinary fetch)
     const layoutMap = {
-      layout1: "layout1_iapcxc",
-      layout2: "layout2_ipvb9q",
+      layout1: "layout1.png",
+      layout2: "layout2.png",
     };
-    const layoutPublicId = layoutMap[layoutId];
-    if (!layoutPublicId) {
+
+    const layoutFile = layoutMap[layoutId];
+    if (!layoutFile) {
       return res.status(404).json({
         success: false,
         message: `Layout ${layoutId} not found`,
       });
     }
 
-    // 3️⃣ Generate secure URLs for layout + user
-    const layoutUrl = cloudinary.url(layoutPublicId, { secure: true });
-    const userUrl = userUpload.secure_url;
+    const layoutPath = path.join(layoutsDir, layoutFile);
+    const layoutBuffer = await fs.promises.readFile(layoutPath);
 
-    // 4️⃣ Download both images as buffers
-    const [layoutResp, userResp] = await Promise.all([
-      axios.get(layoutUrl, { responseType: "arraybuffer" }),
-      axios.get(userUrl, { responseType: "arraybuffer" }),
-    ]);
+    // 2️⃣ Decode user image from base64
+    const userBuffer = Buffer.from(
+      userImage.replace(/^data:image\/\w+;base64,/, ""),
+      "base64"
+    );
 
-    // 5️⃣ Get layout dimensions
-    const layoutMeta = await sharp(layoutResp.data).metadata();
+    // 3️⃣ Resize + composite
+    const layoutMeta = await sharp(layoutBuffer).metadata();
     const layoutWidth = layoutMeta.width;
-    const layoutHeight = layoutMeta.height + 20;
+    const layoutHeight = layoutMeta.height;
 
-    // 6️⃣ Resize user image proportionally (max 70% of layout)
     const maxUserWidth = Math.floor(layoutWidth * 0.7);
     const maxUserHeight = Math.floor(layoutHeight * 0.7);
 
-    const userBuffer = await sharp(userResp.data)
+    const resizedUser = await sharp(userBuffer)
       .resize({
         width: maxUserWidth,
         height: maxUserHeight,
         fit: "inside",
-        background: { r: 0, g: 0, b: 0, alpha: 0 },
       })
-      .png({ compressionLevel: 9, adaptiveFiltering: true })
+      .png()
       .toBuffer();
 
-    const userMeta = await sharp(userBuffer).metadata();
+    const userMeta = await sharp(resizedUser).metadata();
 
-    // 7️⃣ Ensure layout buffer has exact dimensions
-    const layoutBuffer = await sharp(layoutResp.data)
-      .resize({ width: layoutWidth, height: layoutHeight })
-      .png({ compressionLevel: 9, adaptiveFiltering: true })
-      .toBuffer();
-
-    // 8️⃣ Composite user onto bottom center with 5px gap
     const finalBuffer = await sharp(layoutBuffer)
-  .composite([
-    {
-      input: userBuffer,
-      top: Math.floor(layoutHeight * 0.32), // 75% down from the top
-      left: Math.floor((layoutWidth - userMeta.width) / 2), // center horizontally
-    },
-  ])
-  .flatten({ background: { r: 255, g: 255, b: 255 } })
-  .jpeg({ quality: 80 })
-  .toBuffer();
-
-    // 9️⃣ Upload final image to Cloudinary
-    const finalUpload = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
+      .composite([
         {
-          folder: "final-images",
-          public_id: `final_${Date.now()}`,
-          format: "jpeg",
-          quality: "auto:good",
+          input: resizedUser,
+          top: Math.floor(layoutHeight * 0.32),
+          left: Math.floor((layoutWidth - userMeta.width) / 2),
         },
-        (err, result) => {
-          if (err) reject(err);
-          else resolve(result);
-        }
-      );
-      stream.end(finalBuffer);
-    });
+      ])
+      .jpeg({ quality: 90 })
+      .toBuffer();
 
-    const savedFinalUrl = finalUpload.secure_url;
+    // 4️⃣ Save locally (instead of Cloudinary)
+    const finalPath = path.join(
+      __dirname,
+      "final-images",
+      `final_${Date.now()}.jpg`
+    );
+    await fs.promises.writeFile(finalPath, finalBuffer);
 
-    // 🔟 Send email if requested
-    let emailStatus = false;
+    // 5️⃣ Send email with attachment
     if (email) {
       await transporter.sendMail({
         from: `"Museum of Art and Photography" <${process.env.SMTP_SENDER}>`,
         to: email,
         subject: "🎉 Your Photobooth Image",
-        html: `
-          <p>Hi 👋,</p>
-          <p>Thanks for using our photobooth! 🎨✨</p>
-          <div style="text-align:center; margin:20px 0;">
-            <img src="${savedFinalUrl}" alt="Final Image" style="max-width:100%; border-radius:8px;"/>
-          </div>
-          <p>Or download it here: <a href="${savedFinalUrl}" target="_blank">${savedFinalUrl}</a></p>
-          <br/>
-          <p>Cheers,<br/>Art Photobooth Team</p>
-        `,
+        html: `<p>Hi 👋,</p><p>Thanks for using our photobooth!</p>`,
+        attachments: [
+          {
+            filename: "photobooth.jpg",
+            path: finalPath, // attach directly
+          },
+        ],
       });
-      emailStatus = true;
     }
 
-    res.json({ success: true, finalUrl: savedFinalUrl, emailSent: emailStatus });
+    res.json({ success: true, message: "Image composed and email sent" ,emailSent: true});
   } catch (err) {
     console.error("❌ Compose error:", err);
     res.status(500).json({
@@ -300,6 +281,8 @@ app.post("/compose-final", async (req, res) => {
     });
   }
 });
+
+
 
 
 
