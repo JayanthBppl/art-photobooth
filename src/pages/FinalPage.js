@@ -1,7 +1,6 @@
 import React, { useContext, useEffect, useState, useRef } from "react";
 import { AppContext } from "../context/AppContext";
 import { useNavigate } from "react-router-dom";
-import html2canvas from "html2canvas";
 
 function FinalPage() {
   const { layout, processedImage, user } = useContext(AppContext);
@@ -9,11 +8,13 @@ function FinalPage() {
 
   const [sending, setSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
-  const [qrCode, setQrCode] = useState(null);
+  // const [qrCode, setQrCode] = useState(null);
+  const [finalImageUrl, setFinalImageUrl] = useState(null); // 🔑 Cloudinary-composed image
 
-  const hasRunRef = useRef(false); // ✅ guard against double trigger
+  const hasRunRef = useRef(false);
 
   const BASE_URL = "https://art-photobooth-1.onrender.com";
+  // const BASE_URL = "http://localhost:5000";
 
   useEffect(() => {
     if (!layout || !processedImage) {
@@ -22,81 +23,59 @@ function FinalPage() {
       return;
     }
 
-    // ✅ Prevent running twice (React Strict Mode)
     if (hasRunRef.current) return;
     hasRunRef.current = true;
 
-    const captureAndSendEmail = async () => {
+    const uploadAndSend = async () => {
       try {
         setSending(true);
 
-        const captureArea = document.getElementById("final-composition");
-        if (!captureArea) return;
-
-        // ✅ Generate merged image
-        const canvas = await html2canvas(captureArea, {
-          useCORS: true,
-          backgroundColor: null,
-          scale:2
-        });
-        const mergedImage = canvas.toDataURL("image/png");
-
-        // ✅ Upload merged image to backend (Cloudinary)
-        const uploadRes = await fetch(`${BASE_URL}/upload-final`, {
+        // ✅ Send raw user image + layout info + email
+        const uploadRes = await fetch(`${BASE_URL}/compose-final`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: mergedImage }),
+          body: JSON.stringify({
+            userImage: processedImage,
+            layoutId: layout.id, // e.g., "layout1"
+            email: user?.email, // include user email here
+          }),
         });
 
         const uploadData = await uploadRes.json();
         if (!uploadData.success) {
-          console.error("❌ Upload failed:", uploadData.message);
-          hasRunRef.current = false; // allow retry on failure
+          console.error("❌ Compose failed:", uploadData.message);
+          hasRunRef.current = false;
           return;
         }
 
-        const finalImageUrl = uploadData.url; // ✅ Cloudinary URL
+        // ✅ Save the Cloudinary-composed URL
+        setFinalImageUrl(uploadData.finalUrl);
 
-        // ✅ Send Email with Cloudinary URL (NOT base64)
-        // const emailRes = await fetch(`${BASE_URL}/send-email`, {
+        // ✅ Check email status from backend response
+        if (uploadData.emailSent) {
+          setEmailSent(true);
+        }
+
+        // // ✅ Generate QR code
+        // const qrRes = await fetch(`${BASE_URL}/generate-qr`, {
         //   method: "POST",
         //   headers: { "Content-Type": "application/json" },
-        //   body: JSON.stringify({
-        //     email: user?.email,
-        //     imageUrl: finalImageUrl,
-        //     sender: "hello@map-india.org",
-        //   }),
+        //   body: JSON.stringify({ imageUrl: uploadData.finalUrl }),
         // });
 
-        // const emailData = await emailRes.json();
-        // if (emailData.success) {
-        //   console.log("✅ Email sent to", user?.email);
-        //   setEmailSent(true);
-        // } else {
-        //   console.error("❌ Email failed:", emailData.message);
-        //   hasRunRef.current = false; // allow retry
+        // const qrData = await qrRes.json();
+        // if (qrData.success) {
+        //   setQrCode(qrData.qrCode);
         // }
-
-        // ✅ Generate QR code for final image
-        const qrRes = await fetch(`${BASE_URL}/generate-qr`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageUrl: finalImageUrl }),
-        });
-
-        const qrData = await qrRes.json();
-        if (qrData.success) {
-          setQrCode(qrData.qrCode);
-        }
       } catch (err) {
         console.error("❌ Error in finalization flow:", err);
-        hasRunRef.current = false; // reset so retry is possible
+        hasRunRef.current = false;
       } finally {
         setSending(false);
       }
     };
 
-    captureAndSendEmail();
+    uploadAndSend();
   }, [layout, processedImage, user, navigate]);
 
   if (!layout || !processedImage) {
@@ -110,71 +89,90 @@ function FinalPage() {
   return (
     <div className="container-fluid px-3 py-4" style={{ minHeight: "100vh" }}>
       <div className="row justify-content-center align-items-center h-100">
-        {/* Left: Final Composition */}
+        {/* Left: Preview of composition */}
         <div className="col-lg-6 d-flex flex-column align-items-center mb-4 mb-lg-0">
           <div
-            id="final-composition"
             style={{
               position: "relative",
-              display: "inline-block",
               width: "100%",
               maxWidth: "700px",
+              textAlign: "center",
             }}
           >
-            {/* Layout Template */}
-            <img
-              src={layout.src}
-              alt={layout.id}
-              className="img-fluid"
-              style={{
-                width: "100%",
-                height: "auto",
-                boxShadow: "0 4px 15px rgba(0, 0, 0, 0.4)",
-                borderRadius: "8px",
-              }}
-            />
+            <h4>Preview</h4>
 
-            {/* User Image */}
-            <img
-              src={processedImage}
-              alt="User"
-              className="img-fluid"
-              style={{
-                position: "absolute",
-                top: "65%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                height: "70%",
-                width: "auto",
-                maxHeight: "270px",
-              }}
-            />
+            {finalImageUrl ? (
+              // 🔑 Show final Cloudinary image once ready
+              <img
+                src={finalImageUrl}
+                alt="Final Composed"
+                className="img-fluid"
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 15px rgba(0,0,0,0.4)",
+                }}
+              />
+            ) : (
+              // 🔑 Fallback: Local preview (layout + user overlay)
+              <>
+                {/* Layout background */}
+                <img
+                  src={layout.src}
+                  alt={layout.id}
+                  className="img-fluid"
+                  style={{
+                    width: "100%",
+                    height: "auto",
+                    borderRadius: "8px",
+                    boxShadow: "0 4px 15px rgba(0,0,0,0.4)",
+                  }}
+                />
+
+                {/* User overlay */}
+                <img
+                  src={processedImage}
+                  alt="User"
+                  className="img-fluid"
+                  style={{
+                    position: "absolute",
+                    top: "45%", // match backend gravity:center
+                    left: "50%",
+                    transform: "translate(-50%, -50%) translateY(100px)", // mimic y:100
+                    maxHeight: "60%",
+                    width: "auto",
+                  }}
+                />
+              </>
+            )}
           </div>
 
           {/* Actions */}
           <div className="mt-4 text-center">
-            {/* {sending && <p>Sending your final image to email.</p>}
-            {emailSent && <p className="text-success">✅ Email sent successfully!</p>} */}
-
-            {/* Home button always below */}
+            {sending && <p>Sending your final image to email...</p>}
+            {emailSent && (
+              <p className="text-success">✅ Email sent successfully!</p>
+            )}
             <div className="mt-3">
               <button className="btn btn-danger" onClick={() => navigate("/")}>
                 Home
               </button>
             </div>
           </div>
-
         </div>
 
         {/* Right: QR Code */}
-        <div className="col-lg-4 d-flex flex-column align-items-center mt-5 pt-5">
-          {qrCode && (
+        {/* <div className="col-lg-4 d-flex flex-column align-items-center mt-5 pt-5">
+          {qrCode ? (
             <div className="text-center">
               <img src={qrCode} alt="QR Code" style={{ width: "250px" }} />
-              <h6> Scan and download the image</h6>
+              <h6>Scan to download the final image</h6>
             </div>
+          ) : (
+            <p>Generating QR...</p>
           )}
-        </div>
+        </div> */}
       </div>
     </div>
   );

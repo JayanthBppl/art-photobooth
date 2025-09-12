@@ -10,6 +10,8 @@ const QRCode = require("qrcode");
 const axios = require("axios");
 const FormData = require("form-data");
 const User = require("./models/User");
+const sharp = require("sharp");
+
 
 const app = express();
 
@@ -48,17 +50,14 @@ mongoose
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
-  secure: false, // use STARTTLS, keep false for port 587
+  secure: false, // use STARTTLS (587)
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
 });
 
-
-// ----------------- Routes ----------------- //
-
-// Save user
+// ----------------- User Routes ----------------- //
 app.post("/save-user", async (req, res) => {
   const { name, email } = req.body;
   if (!name || !email)
@@ -75,7 +74,6 @@ app.post("/save-user", async (req, res) => {
   }
 });
 
-// Get all users
 app.get("/users", async (req, res) => {
   try {
     const users = await User.find().sort({ createdAt: -1 });
@@ -85,7 +83,7 @@ app.get("/users", async (req, res) => {
   }
 });
 
-// ----------------- Get Latest DSLR Image ----------------- //
+// ----------------- DSLR Utility ----------------- //
 app.get("/cloudinary/latest-dslr", async (req, res) => {
   try {
     const result = await cloudinary.search
@@ -106,7 +104,6 @@ app.get("/cloudinary/latest-dslr", async (req, res) => {
   }
 });
 
-// ----------------- Retake Latest DSLR ----------------- //
 app.post("/retake", async (req, res) => {
   try {
     const result = await cloudinary.search
@@ -133,7 +130,7 @@ app.post("/retake", async (req, res) => {
   }
 });
 
-// ----------------- Remove Background ----------------- //
+// ----------------- Background Removal ----------------- //
 app.post("/remove-bg", upload.single("image"), async (req, res) => {
   try {
     let fileBuffer, fileName;
@@ -175,81 +172,138 @@ app.post("/remove-bg", upload.single("image"), async (req, res) => {
   }
 });
 
-// ----------------- Upload Final Image to Cloudinary ----------------- //
-app.post("/upload-final", async (req, res) => {
+app.post("/compose-final", async (req, res) => {
   try {
-    const { image } = req.body;
-    if (!image)
-      return res.status(400).json({ success: false, message: "No image provided" });
+    const { userImage, layoutId, email } = req.body;
 
-    const uploadRes = await cloudinary.uploader.upload(image, {
-  folder: "final-layouts",
-  quality: "auto:best",  // Cloudinary auto-optimizes for best visual quality
-  fetch_format: "auto",  // let Cloudinary decide (WebP/AVIF etc.)
-});
+    if (!userImage || !layoutId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing userImage or layoutId" });
+    }
 
-    res.json({ success: true, url: uploadRes.secure_url });
+    // 1️⃣ Upload user image to Cloudinary (temporary)
+    const userUpload = await cloudinary.uploader.upload(userImage, {
+      folder: "user-uploads",
+      quality: "auto:good",
+    });
+
+    // 2️⃣ Map layoutId to actual Cloudinary public_id
+    const layoutMap = {
+      layout1: "layout1_iapcxc",
+      layout2: "layout2_ipvb9q",
+    };
+    const layoutPublicId = layoutMap[layoutId];
+    if (!layoutPublicId) {
+      return res.status(404).json({
+        success: false,
+        message: `Layout ${layoutId} not found`,
+      });
+    }
+
+    // 3️⃣ Generate secure URLs for layout + user
+    const layoutUrl = cloudinary.url(layoutPublicId, { secure: true });
+    const userUrl = userUpload.secure_url;
+
+    // 4️⃣ Download both images as buffers
+    const [layoutResp, userResp] = await Promise.all([
+      axios.get(layoutUrl, { responseType: "arraybuffer" }),
+      axios.get(userUrl, { responseType: "arraybuffer" }),
+    ]);
+
+    // 5️⃣ Get layout dimensions
+    const layoutMeta = await sharp(layoutResp.data).metadata();
+    const layoutWidth = layoutMeta.width;
+    const layoutHeight = layoutMeta.height + 20;
+
+    // 6️⃣ Resize user image proportionally (max 70% of layout)
+    const maxUserWidth = Math.floor(layoutWidth * 0.7);
+    const maxUserHeight = Math.floor(layoutHeight * 0.7);
+
+    const userBuffer = await sharp(userResp.data)
+      .resize({
+        width: maxUserWidth,
+        height: maxUserHeight,
+        fit: "inside",
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+      .png({ compressionLevel: 9, adaptiveFiltering: true })
+      .toBuffer();
+
+    const userMeta = await sharp(userBuffer).metadata();
+
+    // 7️⃣ Ensure layout buffer has exact dimensions
+    const layoutBuffer = await sharp(layoutResp.data)
+      .resize({ width: layoutWidth, height: layoutHeight })
+      .png({ compressionLevel: 9, adaptiveFiltering: true })
+      .toBuffer();
+
+    // 8️⃣ Composite user onto bottom center with 5px gap
+    const finalBuffer = await sharp(layoutBuffer)
+  .composite([
+    {
+      input: userBuffer,
+      top: Math.floor(layoutHeight * 0.32), // 75% down from the top
+      left: Math.floor((layoutWidth - userMeta.width) / 2), // center horizontally
+    },
+  ])
+  .flatten({ background: { r: 255, g: 255, b: 255 } })
+  .jpeg({ quality: 80 })
+  .toBuffer();
+
+    // 9️⃣ Upload final image to Cloudinary
+    const finalUpload = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: "final-images",
+          public_id: `final_${Date.now()}`,
+          format: "jpeg",
+          quality: "auto:good",
+        },
+        (err, result) => {
+          if (err) reject(err);
+          else resolve(result);
+        }
+      );
+      stream.end(finalBuffer);
+    });
+
+    const savedFinalUrl = finalUpload.secure_url;
+
+    // 🔟 Send email if requested
+    let emailStatus = false;
+    if (email) {
+      await transporter.sendMail({
+        from: `"Museum of Art and Photography" <${process.env.SMTP_SENDER}>`,
+        to: email,
+        subject: "🎉 Your Photobooth Image",
+        html: `
+          <p>Hi 👋,</p>
+          <p>Thanks for using our photobooth! 🎨✨</p>
+          <div style="text-align:center; margin:20px 0;">
+            <img src="${savedFinalUrl}" alt="Final Image" style="max-width:100%; border-radius:8px;"/>
+          </div>
+          <p>Or download it here: <a href="${savedFinalUrl}" target="_blank">${savedFinalUrl}</a></p>
+          <br/>
+          <p>Cheers,<br/>Art Photobooth Team</p>
+        `,
+      });
+      emailStatus = true;
+    }
+
+    res.json({ success: true, finalUrl: savedFinalUrl, emailSent: emailStatus });
   } catch (err) {
-    console.error("❌ Upload error:", err);
-    res.status(500).json({ success: false, message: "Failed to upload image" });
-  }
-});
-
-const lastSent = new Map();
-
-app.post("/send-email", async (req, res) => {
-  const { email, imageUrl } = req.body;
-
-  if (!email || !imageUrl) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Email and imageUrl are required" });
-  }
-
-  const now = Date.now();
-  const lastTime = lastSent.get(email) || 0;
-
-  // prevent duplicate sends within 15 seconds
-  if (now - lastTime < 15000) {
-    console.log(`⚠️ Duplicate email blocked for ${email}`);
-    return res.json({
-      success: true,
-      message: "Email already sent recently (blocked duplicate)",
+    console.error("❌ Compose error:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message || "Failed to compose final image",
     });
-  }
-
-  try {
-    await transporter.sendMail({
-      from: `"Museum of Art and Photography" <${process.env.SMTP_SENDER}>`,
-      to: email,
-      subject: "🎉 Your Photobooth Image",
-      html: `
-        <p>Hi 👋,</p>
-        <p>Thanks for using our photobooth! 🎨✨</p>
-        <p>You can view your final image below:</p>
-        <div style="text-align:center; margin:20px 0;">
-          <img src="${imageUrl}" alt="Final Image" style="max-width:100%; border-radius:8px;"/>
-        </div>
-        <p>Or download it here: <a href="${imageUrl}" target="_blank">${imageUrl}</a></p>
-        <br/>
-        <p>Cheers,<br/>Art Photobooth Team</p>
-      `,
-    });
-
-    // record timestamp to block future duplicates
-    lastSent.set(email, now);
-
-    console.log(`✅ Email sent to ${email}`);
-    res.json({ success: true, message: "Email sent successfully" });
-  } catch (error) {
-    console.error("❌ Email error:", error);
-    res.status(500).json({ success: false, message: "Failed to send email" });
   }
 });
 
 
 
-// ----------------- Generate QR Code ----------------- //
+// ----------------- QR Code Generator ----------------- //
 app.post("/generate-qr", async (req, res) => {
   const { imageUrl } = req.body;
   if (!imageUrl)

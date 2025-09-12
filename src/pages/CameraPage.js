@@ -21,6 +21,7 @@ const CameraPage = () => {
   const [showButton, setShowButton] = useState(false);
 
   const BASE_URL = "https://art-photobooth-1.onrender.com";
+  // const BASE_URL = "http://localhost:5000";
 
   // Trigger the "Go and take a photo" text when layout is selected
   useEffect(() => {
@@ -40,7 +41,7 @@ const CameraPage = () => {
   // Countdown for loading GIF before showing button
   useEffect(() => {
     if (showLoadingGif && !capturedImage) {
-      setCountdown(3);
+      setCountdown(7);
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
