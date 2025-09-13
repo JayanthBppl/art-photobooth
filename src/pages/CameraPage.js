@@ -20,8 +20,8 @@ const CameraPage = () => {
   const [countdown, setCountdown] = useState(5);
   const [showButton, setShowButton] = useState(false);
 
-  const BASE_URL = "https://art-photobooth-1.onrender.com";
-  // const BASE_URL = "http://localhost:5000";
+  // const BASE_URL = "https://art-photobooth-1.onrender.com";
+  const BASE_URL = "http://localhost:5000";
 
   // Trigger the "Go and take a photo" text when layout is selected
   useEffect(() => {

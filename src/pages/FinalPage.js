@@ -8,13 +8,13 @@ function FinalPage() {
 
   const [sending, setSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
-  // const [qrCode, setQrCode] = useState(null);
-  const [finalImageUrl, setFinalImageUrl] = useState(null); // 🔑 Cloudinary-composed image
+  const [emailError, setEmailError] = useState(false);
+  const [finalImageUrl, setFinalImageUrl] = useState(null);
 
   const hasRunRef = useRef(false);
 
-  const BASE_URL = "https://art-photobooth-1.onrender.com";
-  // const BASE_URL = "http://localhost:5000";
+  // const BASE_URL = "https://art-photobooth-1.onrender.com";
+  const BASE_URL = "http://localhost:5000";
 
   useEffect(() => {
     if (!layout || !processedImage) {
@@ -29,15 +29,16 @@ function FinalPage() {
     const uploadAndSend = async () => {
       try {
         setSending(true);
+        setEmailSent(false);
+        setEmailError(false);
 
-        // ✅ Send raw user image + layout info + email
         const uploadRes = await fetch(`${BASE_URL}/compose-final`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userImage: processedImage,
-            layoutId: layout.id, // e.g., "layout1"
-            email: user?.email, // include user email here
+            layoutId: layout.id,
+            email: user?.email,
           }),
         });
 
@@ -47,25 +48,22 @@ function FinalPage() {
           hasRunRef.current = false;
           return;
         }
-        if(uploadData.emailSent === true){
-          alert("Email sent successfully")
+
+        // ✅ Email status from backend
+        if (uploadData.emailSent) {
+          setEmailSent(true);
+        } else if (user?.email) {
+          setEmailError(true);
         }
 
-
-        // // ✅ Generate QR code
-        // const qrRes = await fetch(`${BASE_URL}/generate-qr`, {
-        //   method: "POST",
-        //   headers: { "Content-Type": "application/json" },
-        //   body: JSON.stringify({ imageUrl: uploadData.finalUrl }),
-        // });
-
-        // const qrData = await qrRes.json();
-        // if (qrData.success) {
-        //   setQrCode(qrData.qrCode);
-        // }
+        // If backend returns image path/finalUrl, set preview
+        if (uploadData.finalUrl) {
+          setFinalImageUrl(uploadData.finalUrl);
+        }
       } catch (err) {
         console.error("❌ Error in finalization flow:", err);
         hasRunRef.current = false;
+        setEmailError(true);
       } finally {
         setSending(false);
       }
@@ -98,7 +96,6 @@ function FinalPage() {
             <h4>Preview</h4>
 
             {finalImageUrl ? (
-              // 🔑 Show final Cloudinary image once ready
               <img
                 src={finalImageUrl}
                 alt="Final Composed"
@@ -111,7 +108,6 @@ function FinalPage() {
                 }}
               />
             ) : (
-              // 🔑 Fallback: Local preview (layout + user overlay)
               <>
                 {/* Layout background */}
                 <img
@@ -133,9 +129,9 @@ function FinalPage() {
                   className="img-fluid"
                   style={{
                     position: "absolute",
-                    top: "45%", // match backend gravity:center
+                    top: "45%",
                     left: "50%",
-                    transform: "translate(-50%, -50%) translateY(100px)", // mimic y:100
+                    transform: "translate(-50%, -50%) translateY(100px)",
                     maxHeight: "60%",
                     width: "auto",
                   }}
@@ -146,10 +142,10 @@ function FinalPage() {
 
           {/* Actions */}
           <div className="mt-4 text-center">
-            {sending && <p>Sending your final image to email...</p>}
-            {emailSent && (
-              <p className="text-success">✅ Email sent successfully!</p>
-            )}
+            {sending && <p>⏳ Sending your final image to email...</p>}
+            {emailSent && <p className="text-success">✅ Email sent successfully!</p>}
+            {emailError && <p className="text-danger">❌ Image created but email failed.</p>}
+
             <div className="mt-3">
               <button className="btn btn-danger" onClick={() => navigate("/")}>
                 Home
@@ -157,18 +153,6 @@ function FinalPage() {
             </div>
           </div>
         </div>
-
-        {/* Right: QR Code */}
-        {/* <div className="col-lg-4 d-flex flex-column align-items-center mt-5 pt-5">
-          {qrCode ? (
-            <div className="text-center">
-              <img src={qrCode} alt="QR Code" style={{ width: "250px" }} />
-              <h6>Scan to download the final image</h6>
-            </div>
-          ) : (
-            <p>Generating QR...</p>
-          )}
-        </div> */}
       </div>
     </div>
   );

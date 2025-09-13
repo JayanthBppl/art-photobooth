@@ -19,8 +19,8 @@ function UserAndLayoutPage() {
     // add more layouts if needed
   ];
 
-  const BASE_URL = "https://art-photobooth-1.onrender.com";
-  // const BASE_URL = "http://localhost:5000";
+  // const BASE_URL = "https://art-photobooth-1.onrender.com";
+  const BASE_URL = "http://localhost:5000";
 
   // Preload layout images after form submission
   useEffect(() => {

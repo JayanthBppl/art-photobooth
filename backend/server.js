@@ -183,11 +183,13 @@ app.post("/compose-final", async (req, res) => {
     const { userImage, layoutId, email } = req.body;
 
     if (!userImage || !layoutId) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Missing userImage or layoutId" });
+      return res.status(400).json({
+        success: false,
+        message: "Missing userImage or layoutId",
+      });
     }
-     const layoutsDir = path.join(__dirname, "assets");
+
+    const layoutsDir = path.join(__dirname, "assets");
     const outputDir = path.join(__dirname, "final-images");
 
     // ✅ Ensure final-images folder exists
@@ -195,7 +197,7 @@ app.post("/compose-final", async (req, res) => {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    // 1️⃣ Load layout locally (no Cloudinary fetch)
+    // ✅ Local layout mapping
     const layoutMap = {
       layout1: "layout1.png",
       layout2: "layout2.png",
@@ -212,13 +214,13 @@ app.post("/compose-final", async (req, res) => {
     const layoutPath = path.join(layoutsDir, layoutFile);
     const layoutBuffer = await fs.promises.readFile(layoutPath);
 
-    // 2️⃣ Decode user image from base64
+    // ✅ Decode user image
     const userBuffer = Buffer.from(
       userImage.replace(/^data:image\/\w+;base64,/, ""),
       "base64"
     );
 
-    // 3️⃣ Resize + composite
+    // ✅ Resize + composite
     const layoutMeta = await sharp(layoutBuffer).metadata();
     const layoutWidth = layoutMeta.width;
     const layoutHeight = layoutMeta.height;
@@ -248,31 +250,43 @@ app.post("/compose-final", async (req, res) => {
       .jpeg({ quality: 90 })
       .toBuffer();
 
-    // 4️⃣ Save locally (instead of Cloudinary)
+    // ✅ Save image
     const finalPath = path.join(
-      __dirname,
-      "final-images",
+      outputDir,
       `final_${Date.now()}.jpg`
     );
     await fs.promises.writeFile(finalPath, finalBuffer);
 
-    // 5️⃣ Send email with attachment
+    // ✅ Send email if provided
+    let emailSent = false;
     if (email) {
-      await transporter.sendMail({
-        from: `"Museum of Art and Photography" <${process.env.SMTP_SENDER}>`,
-        to: email,
-        subject: "🎉 Your Photobooth Image",
-        html: `<p>Hi 👋,</p><p>Thanks for using our photobooth!</p>`,
-        attachments: [
-          {
-            filename: "photobooth.jpg",
-            path: finalPath, // attach directly
-          },
-        ],
-      });
+      try {
+        await transporter.sendMail({
+          from: `"Museum of Art and Photography" <${process.env.SMTP_SENDER}>`,
+          to: email,
+          subject: "🎉 Your Photobooth Image",
+          html: `<p>Hi 👋,</p><p>Thanks for using our photobooth!</p>`,
+          attachments: [
+            {
+              filename: "photobooth.jpg",
+              path: finalPath, // attach final image
+            },
+          ],
+        });
+        emailSent = true;
+      } catch (mailErr) {
+        console.error("❌ Email send error:", mailErr);
+      }
     }
 
-    res.json({ success: true, message: "Image composed and email sent" ,emailSent: true});
+    res.json({
+      success: true,
+      message: emailSent
+        ? "Image composed and email sent ✅"
+        : "Image composed successfully (email not sent)",
+      emailSent,
+      imagePath: finalPath, // optional for debugging
+    });
   } catch (err) {
     console.error("❌ Compose error:", err);
     res.status(500).json({
@@ -281,6 +295,7 @@ app.post("/compose-final", async (req, res) => {
     });
   }
 });
+
 
 
 
